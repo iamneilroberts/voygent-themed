@@ -25,11 +25,11 @@ export async function onRequest(context: { request: Request; env: Env; params: {
   try {
     const tripId = params.id;
 
-    // Query heritage_trips
+    // Query themed_trips
     const trip = await env.DB
       .prepare(
         `SELECT id, intake_json, options_json, itinerary_json, variants_json, created_at
-         FROM heritage_trips
+         FROM themed_trips
          WHERE id = ?`
       )
       .bind(tripId)

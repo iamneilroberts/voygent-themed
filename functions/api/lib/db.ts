@@ -29,13 +29,13 @@ export interface Message {
 export async function createTrip(db: D1Database, userId: string | null, template: string = 'heritage'): Promise<string> {
   const id = nanoid();
   await db.prepare(
-    `INSERT INTO heritage_trips (id, user_id, template, status) VALUES (?, ?, ?, ?)`
+    `INSERT INTO themed_trips (id, user_id, template, status) VALUES (?, ?, ?, ?)`
   ).bind(id, userId, template, 'intake').run();
   return id;
 }
 
 export async function getTrip(db: D1Database, id: string): Promise<Trip | null> {
-  const result = await db.prepare(`SELECT * FROM heritage_trips WHERE id = ?`).bind(id).first();
+  const result = await db.prepare(`SELECT * FROM themed_trips WHERE id = ?`).bind(id).first();
   return result as Trip | null;
 }
 
@@ -45,14 +45,14 @@ export async function updateTrip(db: D1Database, id: string, updates: Partial<Tr
   const values = fields.map(f => updates[f as keyof Trip]);
 
   await db.prepare(
-    `UPDATE heritage_trips SET ${setClause}, updated_at = unixepoch() WHERE id = ?`
+    `UPDATE themed_trips SET ${setClause}, updated_at = unixepoch() WHERE id = ?`
   ).bind(...values, id).run();
 }
 
 export async function listTrips(db: D1Database, userId: string | null, limit: number = 50): Promise<Trip[]> {
   const query = userId
-    ? db.prepare(`SELECT * FROM heritage_trips WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`).bind(userId, limit)
-    : db.prepare(`SELECT * FROM heritage_trips ORDER BY created_at DESC LIMIT ?`).bind(limit);
+    ? db.prepare(`SELECT * FROM themed_trips WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`).bind(userId, limit)
+    : db.prepare(`SELECT * FROM themed_trips ORDER BY created_at DESC LIMIT ?`).bind(limit);
 
   const result = await query.all();
   return result.results as Trip[];
@@ -69,7 +69,7 @@ export async function saveMessage(
 ): Promise<void> {
   const id = nanoid();
   await db.prepare(
-    `INSERT INTO heritage_messages (id, trip_id, role, content, tokens_in, tokens_out, cost_usd) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO themed_messages (id, trip_id, role, content, tokens_in, tokens_out, cost_usd) VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(id, tripId, role, content, tokensIn, tokensOut, costUsd).run();
 }
 

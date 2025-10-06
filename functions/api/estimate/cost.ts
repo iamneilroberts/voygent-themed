@@ -4,7 +4,7 @@
  * Feature: 001-web-search-integration
  *
  * Calculates per-person trip cost with 10-15% commission headroom.
- * Stores result in heritage_trips.variants_json.cost_estimate.
+ * Stores result in themed_trips.variants_json.cost_estimate.
  */
 
 import { calculateCostEstimate, type CostEstimateInput } from '../lib/cost-estimator';
@@ -63,9 +63,9 @@ export async function onRequest(context: { request: Request; env: Env }) {
     // Calculate cost estimate
     const costEstimate = calculateCostEstimate(input);
 
-    // Store in heritage_trips.variants_json.cost_estimate
+    // Store in themed_trips.variants_json.cost_estimate
     const trip = await env.DB
-      .prepare('SELECT variants_json FROM heritage_trips WHERE id = ?')
+      .prepare('SELECT variants_json FROM themed_trips WHERE id = ?')
       .bind(input.trip_id)
       .first();
 
@@ -87,7 +87,7 @@ export async function onRequest(context: { request: Request; env: Env }) {
 
     // Update trip record
     await env.DB
-      .prepare('UPDATE heritage_trips SET variants_json = ?, updated_at = unixepoch() WHERE id = ?')
+      .prepare('UPDATE themed_trips SET variants_json = ?, updated_at = unixepoch() WHERE id = ?')
       .bind(JSON.stringify(variantsJson), input.trip_id)
       .run();
 
