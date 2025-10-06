@@ -12,6 +12,9 @@ export interface TripTemplate {
   requiredFields: string[];   // Fields that MUST be extracted
   optionalFields: string[];   // Fields that are nice to have
   exampleInputs: string[];    // Example user inputs for this theme
+  tags?: string[];            // Search/filter tags
+  isFeatured?: boolean;       // Show in featured section
+  displayOrder?: number;      // Order in featured section
 }
 
 // Default template ID for fallback
@@ -28,6 +31,9 @@ interface TemplateRow {
   optional_fields: string;
   example_inputs: string;
   is_active: number;
+  tags?: string;
+  is_featured?: number;
+  display_order?: number;
 }
 
 function parseJsonArray(value: string | null, fallback: string[] = []): string[] {
@@ -50,7 +56,10 @@ function rowToTemplate(row: TemplateRow): TripTemplate {
     optionsPrompt: row.options_prompt,
     requiredFields: parseJsonArray(row.required_fields),
     optionalFields: parseJsonArray(row.optional_fields),
-    exampleInputs: parseJsonArray(row.example_inputs)
+    exampleInputs: parseJsonArray(row.example_inputs),
+    tags: row.tags ? parseJsonArray(row.tags) : undefined,
+    isFeatured: row.is_featured === 1,
+    displayOrder: row.display_order
   };
 }
 

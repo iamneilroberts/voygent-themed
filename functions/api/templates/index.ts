@@ -20,7 +20,10 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
         name: t.name,
         description: t.description,
         icon: t.icon,
-        exampleInputs: t.exampleInputs
+        exampleInputs: t.exampleInputs,
+        tags: t.tags,
+        isFeatured: t.isFeatured,
+        displayOrder: t.displayOrder
       }))
     }), {
       status: 200,

@@ -1,6 +1,7 @@
 // Main application coordinator - imports and wires up all modules
 
-import { initThemeSelector } from './theme.js';
+import { initThemeSelector as initOldThemeSelector } from './theme.js';
+import { initThemeSelector } from './theme-selector.js';
 import { initLocationDetection } from './location.js';
 import { initFileUpload } from './files.js';
 import { doResearchOnly } from './research.js';
@@ -12,11 +13,23 @@ window.addEventListener('DOMContentLoaded', () => {
   // Initialize location detection
   initLocationDetection();
 
-  // Initialize theme selector with change callback
-  initThemeSelector((newTheme, oldTheme) => {
+  // Initialize dynamic theme selector (database-driven)
+  initThemeSelector();
+
+  // Initialize old theme form handler with change callback
+  initOldThemeSelector((newTheme, oldTheme) => {
     // If changing themes and there are existing results, clear them
     if (window.currentTripId) {
       console.log(`[THEME CHANGE] Switching from ${oldTheme} to ${newTheme}, clearing results`);
+      resetPreviousResults();
+    }
+  });
+
+  // Listen for theme changes from dynamic selector
+  window.addEventListener('themeChanged', (e) => {
+    const { themeId } = e.detail;
+    if (window.currentTripId) {
+      console.log(`[THEME CHANGE] Switching to ${themeId}, clearing results`);
       resetPreviousResults();
     }
   });
