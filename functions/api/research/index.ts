@@ -8,6 +8,7 @@ import { extractTextFromImage, isImageFile } from '../lib/ocr';
 import { getTemplate } from '../lib/trip-templates';
 
 interface Env {
+  DB: D1Database;
   AI?: any;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
@@ -56,7 +57,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     console.log('[Research] Full input length:', fullInput.length);
 
     // Step 2: Normalize intake with theme-specific prompt
-    const template = getTemplate(theme);
+    const template = await getTemplate(theme, env.DB);
     if (!template) {
       return new Response(JSON.stringify({
         error: 'Invalid theme',
