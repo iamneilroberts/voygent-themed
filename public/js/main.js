@@ -6,7 +6,7 @@ import { initLocationDetection } from './location.js';
 import { initFileUpload } from './files.js';
 import { doResearchOnly } from './research.js';
 import { setupCollapsibleSection, toggleDiagnostics } from './ui.js';
-import { resetPreviousResults } from './trips.js';
+import { resetPreviousResults, buildTextInput, displayResearchSummary } from './trips.js';
 import { loadBranding } from './branding.js';
 import { showProgress, hideProgress } from './progress.js';
 import { initCompactThemeSelector } from './compact-theme-selector.js';
@@ -109,9 +109,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Display research summary if present
       if (data.diagnostics && data.diagnostics.research && data.diagnostics.research.length > 0) {
-        if (window.displayResearchSummary) {
-          displayResearchSummary(data.diagnostics.research);
-        }
+        console.log('[Generate Full Trip] Displaying research:', data.diagnostics.research);
+        displayResearchSummary(data.diagnostics.research);
       }
 
       // Display trip options
