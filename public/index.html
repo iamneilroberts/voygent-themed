@@ -166,7 +166,7 @@
       margin: 20px 0;
     }
 
-    .hidden { display: none; }
+    .hidden { display: none !important; }
 
     /* Chat Interface */
     .chat-section {
@@ -345,6 +345,604 @@
         transform: translateX(0);
       }
     }
+
+    /* Progress Overlay Styles */
+    .progress-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .progress-modal {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    .progress-message {
+      font-size: 1.1rem;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+    }
+
+    /* Modal Styles */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .modal-content {
+      position: relative;
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      z-index: 1;
+    }
+    .modal-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: transparent;
+      border: none;
+      font-size: 2rem;
+      line-height: 1;
+      color: #999;
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+    .modal-close:hover {
+      color: #333;
+      transform: none;
+    }
+    @media (max-width: 768px) {
+      .modal-content {
+        padding: 30px 20px;
+        width: 95%;
+      }
+    }
+
+    /* CSS Variables for Branding */
+    :root {
+      --primary-color: #667eea;
+      --accent-color: #764ba2;
+    }
+
+    /* Compact Theme Selector Styles */
+    .theme-selector-compact {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      max-width: 900px;
+      margin: 0 auto 20px;
+    }
+    .theme-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 15px 20px;
+      background: white;
+      border: 3px solid transparent;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      min-width: 120px;
+    }
+    .theme-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .theme-btn.active {
+      border-color: var(--primary-color);
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    }
+    .theme-btn .icon {
+      font-size: 2.5rem;
+    }
+    .theme-btn .label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #667eea;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      .theme-selector-compact {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .theme-btn {
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 12px 15px;
+      }
+      .theme-btn .icon {
+        font-size: 2rem;
+      }
+    }
+
+    /* Quick Search Styles */
+    .quick-search-section {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .quick-search-input {
+      width: 100%;
+      padding: 14px;
+      font-size: 1.1rem;
+      border: 2px solid var(--accent-color);
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .or-divider {
+      position: relative;
+      text-align: center;
+      margin: 30px 0;
+    }
+    .or-divider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #ddd;
+    }
+    .or-divider span {
+      position: relative;
+      background: #f8f9fa;
+      padding: 0 15px;
+      color: #999;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    /* Collapsible Details Styles */
+    details {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--primary-color);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+    details summary::before {
+      content: '▶';
+      transition: transform 0.3s;
+      display: inline-block;
+    }
+    details[open] summary::before {
+      transform: rotate(90deg);
+    }
+    details[open] {
+      background: #f8f9fa;
+    }
+
+    /* Generate Button Styles */
+    .generate-btn {
+      width: 100%;
+      max-width: 600px;
+      margin: 30px auto;
+      display: block;
+      font-size: 1.2rem;
+      padding: 16px 32px;
+    }
+
+    /* Trip Option Cards */
+    #optionsGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin: 30px 0;
+    }
+
+    .trip-option-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+
+    .trip-option-card:hover {
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .trip-option-card.selected {
+      border-color: #667eea;
+      background: linear-gradient(to bottom, #ffffff 0%, #f0f3ff 100%);
+    }
+
+    .trip-option-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .trip-option-key {
+      background: #667eea;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    .trip-option-title {
+      color: #333;
+      font-size: 1.3rem;
+      margin: 0;
+      flex: 1;
+    }
+
+    .trip-option-body {
+      margin-bottom: 20px;
+    }
+
+    .duration-badge {
+      display: inline-block;
+      background: #e8eeff;
+      color: #667eea;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .trip-option-cities {
+      color: #666;
+      margin: 12px 0;
+      font-size: 0.95rem;
+    }
+
+    .trip-option-description {
+      color: #555;
+      line-height: 1.6;
+      margin: 12px 0;
+    }
+
+    .trip-option-budget {
+      color: #333;
+      font-size: 1.1rem;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .trip-option-footer {
+      text-align: center;
+    }
+
+    .select-trip-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      width: 100%;
+    }
+
+    .select-trip-btn:hover {
+      background: #5568d3;
+    }
+
+    .trip-option-card.selected .select-trip-btn {
+      background: #4CAF50;
+    }
+
+    .trip-option-card.selected .select-trip-btn:hover {
+      background: #45a049;
+    }
+
+    /* Itinerary Display */
+    .itinerary-header {
+      text-align: center;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .itinerary-header h2 {
+      color: #667eea;
+      font-size: 2rem;
+      margin-bottom: 12px;
+    }
+
+    .itinerary-overview {
+      color: #666;
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .city-section {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .city-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .city-header h3 {
+      color: #333;
+      font-size: 1.5rem;
+      margin: 0;
+    }
+
+    .nights-badge {
+      background: #e8eeff;
+      color: #667eea;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .city-days {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .day-card {
+      display: flex;
+      gap: 20px;
+      padding: 16px;
+      border-left: 4px solid #667eea;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .day-number {
+      background: #667eea;
+      color: white;
+      min-width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+
+    .day-content {
+      flex: 1;
+    }
+
+    .day-activity {
+      margin-bottom: 10px;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .day-why {
+      color: #666;
+      font-style: italic;
+      margin-top: 12px;
+      padding-left: 12px;
+      border-left: 2px solid #e0e0e0;
+    }
+
+    .travel-info {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #fff9e6;
+      border-radius: 6px;
+      color: #856404;
+      font-size: 0.9rem;
+    }
+
+    /* Cost Breakdown */
+    .cost-breakdown {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 32px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .cost-breakdown h3 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .cost-table tr {
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .cost-table td {
+      padding: 12px 8px;
+    }
+
+    .cost-amount {
+      text-align: right;
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    .cost-notes {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    .cost-total td {
+      padding-top: 16px;
+      border-top: 2px solid #667eea;
+      font-size: 1.1rem;
+    }
+
+    .cost-notes-detail {
+      color: #666;
+      line-height: 1.6;
+      margin: 16px 0;
+    }
+
+    .cost-assumptions {
+      background: #f9fafb;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+
+    .cost-assumptions ul {
+      margin-top: 8px;
+      margin-left: 20px;
+      color: #666;
+    }
+
+    .cost-disclaimer {
+      color: #666;
+      font-size: 0.95rem;
+      font-style: italic;
+      margin-top: 20px;
+      padding: 12px;
+      background: #f0f3ff;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+
+    /* Quote Request Button */
+    .itinerary-footer {
+      text-align: center;
+      margin-top: 32px;
+    }
+
+    .request-quote-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 16px 48px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .request-quote-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    /* Responsive Design for Trip Options */
+    @media (max-width: 768px) {
+      #optionsGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .city-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .day-card {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .day-number {
+        width: 50px;
+        height: 50px;
+        font-size: 0.85rem;
+      }
+
+      .cost-table td:last-child {
+        display: block;
+        padding-left: 8px;
+        padding-top: 4px;
+        font-size: 0.85rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -354,60 +952,60 @@
   </header>
 
   <div class="container">
-    <!-- Trip Theme Selector -->
-    <div class="quick-tuner" style="text-align: center; padding: 30px;">
-      <h2 style="font-size: 1.8rem; margin-bottom: 20px;">Choose Your Trip Theme</h2>
-      <div id="themeSelector" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto;">
-        <div class="theme-card" data-theme="heritage" style="cursor: pointer; padding: 20px; background: white; border: 3px solid transparent; border-radius: 12px; transition: all 0.3s;">
-          <div style="font-size: 3rem; margin-bottom: 10px;">🌳</div>
-          <h3 style="margin: 0 0 8px 0; color: #667eea;">Heritage & Ancestry</h3>
-          <p style="font-size: 0.9rem; color: #666; margin: 0;">Explore your family roots</p>
-        </div>
-        <div class="theme-card" data-theme="tvmovie" style="cursor: pointer; padding: 20px; background: white; border: 3px solid transparent; border-radius: 12px; transition: all 0.3s;">
-          <div style="font-size: 3rem; margin-bottom: 10px;">🎬</div>
-          <h3 style="margin: 0 0 8px 0; color: #667eea;">TV & Movie Locations</h3>
-          <p style="font-size: 0.9rem; color: #666; margin: 0;">Visit filming locations</p>
-        </div>
-        <div class="theme-card" data-theme="historical" style="cursor: pointer; padding: 20px; background: white; border: 3px solid transparent; border-radius: 12px; transition: all 0.3s;">
-          <div style="font-size: 3rem; margin-bottom: 10px;">⚔️</div>
-          <h3 style="margin: 0 0 8px 0; color: #667eea;">Historical Events</h3>
-          <p style="font-size: 0.9rem; color: #666; margin: 0;">Walk through history</p>
-        </div>
-        <div class="theme-card" data-theme="culinary" style="cursor: pointer; padding: 20px; background: white; border: 3px solid transparent; border-radius: 12px; transition: all 0.3s;">
-          <div style="font-size: 3rem; margin-bottom: 10px;">🍴</div>
-          <h3 style="margin: 0 0 8px 0; color: #667eea;">Culinary Tours</h3>
-          <p style="font-size: 0.9rem; color: #666; margin: 0;">Explore regional cuisines</p>
-        </div>
-        <div class="theme-card" data-theme="adventure" style="cursor: pointer; padding: 20px; background: white; border: 3px solid transparent; border-radius: 12px; transition: all 0.3s;">
-          <div style="font-size: 3rem; margin-bottom: 10px;">🏔️</div>
-          <h3 style="margin: 0 0 8px 0; color: #667eea;">Adventure & Outdoor</h3>
-          <p style="font-size: 0.9rem; color: #666; margin: 0;">Hiking, wildlife, nature</p>
-        </div>
+    <!-- Compact Theme Selector -->
+    <div class="quick-tuner" style="padding: 25px 20px;">
+      <h2 style="font-size: 1.5rem; margin-bottom: 20px; text-align: center;">Choose Your Trip Theme</h2>
+      <div class="theme-selector-compact">
+        <button type="button" class="theme-btn active" data-theme="heritage">
+          <span class="icon">🌳</span>
+          <span class="label">Heritage</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme="tvmovie">
+          <span class="icon">🎬</span>
+          <span class="label">TV/Movie</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme="historical">
+          <span class="icon">⚔️</span>
+          <span class="label">Historical</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme="culinary">
+          <span class="icon">🍴</span>
+          <span class="label">Culinary</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme="adventure">
+          <span class="icon">🏔️</span>
+          <span class="label">Adventure</span>
+        </button>
       </div>
       <input type="hidden" id="selectedTheme" value="heritage">
     </div>
 
-    <!-- Hero Quick Start -->
-    <div class="quick-tuner" style="text-align: center; padding: 40px 30px;">
-      <h2 style="font-size: 2rem; margin-bottom: 15px;">✨ <span id="heroTitle">Follow Your Family Roots</span></h2>
-      <p id="heroSubtitle" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;">Enter your surname and we'll create a personalized heritage trip in seconds</p>
-      <div style="display: flex; gap: 12px; max-width: 500px; margin: 0 auto; flex-wrap: wrap; justify-content: center;">
-        <input type="text" id="quickStartInput" placeholder="Enter your surname (e.g., McElroy)"
-               style="flex: 1; min-width: 200px; padding: 14px; font-size: 1.1rem; border: 2px solid #764ba2;">
-        <button type="button" id="quickStartBtn" style="padding: 14px 28px; font-size: 1.1rem; white-space: nowrap;">
-          🚀 Create My Trip
-        </button>
-      </div>
-      <p style="margin-top: 15px; font-size: 0.9rem; color: #888;">Or customize details below ↓</p>
-    </div>
+    <!-- Unified Quick Search Section -->
+    <div class="quick-tuner" style="padding: 30px;">
+      <div class="quick-search-section">
+        <h2 id="themeTitle" style="font-size: 1.8rem; margin-bottom: 10px; text-align: center; color: var(--primary-color);">Heritage & Ancestry Trip</h2>
+        <p id="themeSubtitle" style="text-align: center; color: #666; margin-bottom: 20px;">Explore your family roots and ancestral heritage</p>
 
-    <!-- Quick Tuner Section -->
-    <div class="quick-tuner" id="customizeSection">
-      <div class="form-collapsible-header" id="formCollapseHeader">
-        <h2>📝 Customize Your Trip</h2>
-        <span class="collapse-toggle collapsed">▼</span>
-      </div>
-      <form id="quickTunerForm" class="form-content collapsed" style="margin-top: 20px;">
+        <input
+          type="text"
+          id="quickSearch"
+          class="quick-search-input"
+          placeholder="Enter family surname (e.g., McLeod)"
+          data-heritage-placeholder="Enter family surname (e.g., McLeod)"
+          data-tvmovie-placeholder="Enter show/movie name (e.g., Game of Thrones)"
+          data-historical-placeholder="Enter historical event (e.g., D-Day Normandy)"
+          data-culinary-placeholder="Enter cuisine or region (e.g., Tuscany pasta)"
+          data-adventure-placeholder="Enter activity (e.g., Patagonia hiking)"
+        />
+
+        <div class="or-divider">
+          <span>OR</span>
+        </div>
+
+        <!-- Collapsible Customize Section -->
+        <details id="customizeDetails">
+          <summary>📝 Customize Your Trip</summary>
+          <form id="quickTunerForm" style="margin-top: 20px;">
         <div class="form-grid">
           <div class="form-group" id="themeSpecificField1">
             <label for="surnames" id="field1Label">Family Surnames *</label>
@@ -500,25 +1098,21 @@
           <textarea id="notes" placeholder="Paste genealogy URLs, add context about your family history..."></textarea>
         </div>
       </form>
-    </div>
 
-    <!-- Upload Section -->
-    <div class="upload-section" id="uploadSection">
-      <div class="form-collapsible-header" id="uploadCollapseHeader">
-        <h2>📎 Upload Documents</h2>
-        <span class="collapse-toggle collapsed">▼</span>
-      </div>
-      <div class="form-content collapsed" id="uploadContent" style="margin-top: 20px;">
+      <!-- Upload Section -->
+      <div class="upload-section" id="uploadSection" style="margin-top: 30px;">
+        <h3 style="margin-bottom: 15px;">📎 Upload Documents</h3>
         <div class="upload-area" id="uploadArea">
-        <p>📁 Drop files here or click to upload</p>
-        <p style="font-size: 0.9rem; color: #999; margin-top: 10px;">
-          PDFs, images (OCR supported), or text documents
-        </p>
-        <input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt" style="display:none;">
+          <p>📁 Drop files here or click to upload</p>
+          <p style="font-size: 0.9rem; color: #999; margin-top: 10px;">
+            PDFs, images (OCR supported), or text documents
+          </p>
+          <input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt" style="display:none;">
+        </div>
+        <div id="fileList" style="margin-top: 15px;"></div>
       </div>
-      <div id="fileList" style="margin-top: 15px;"></div>
-      </div>
-    </div>
+    </details>
+  </div>
 
     <button id="generateBtn" onclick="generateTrip()">✨ Generate Trip Options</button>
 
@@ -603,6 +1197,101 @@
   <button class="toggle-diagnostics" onclick="toggleDiagnostics()">
     <span id="diagToggleText">▲ Show Diagnostics</span>
   </button>
+
+  <!-- Progress Overlay -->
+  <div id="progressOverlay" class="progress-overlay hidden">
+    <div class="progress-modal">
+      <div class="spinner"></div>
+      <p id="progressMessage" class="progress-message">Understanding your preferences...</p>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traveler Intake Modal -->
+  <div id="travelerIntakeModal" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeTravelerIntake()"></div>
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeTravelerIntake()">×</button>
+
+      <h2>Complete Your Quote Request</h2>
+      <p style="color: #666; margin-bottom: 25px;">Help us connect you with the perfect travel professional</p>
+
+      <form id="travelerIntakeForm">
+        <!-- Required fields -->
+        <div class="form-group">
+          <label>Primary Traveler Name <span class="required" style="color: #c33;">*</span></label>
+          <input type="text" name="primary_name" required />
+        </div>
+
+        <div class="form-group">
+          <label>Email <span class="required" style="color: #c33;">*</span></label>
+          <input type="email" name="email" required />
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" name="phone" placeholder="(555) 123-4567" />
+        </div>
+
+        <!-- Optional fields (collapsible) -->
+        <details style="margin-top: 20px;">
+          <summary style="cursor: pointer; font-weight: 600; color: #667eea; margin-bottom: 15px;">Additional Traveler Details (Optional)</summary>
+
+          <div class="form-group">
+            <label>All Travelers (names and ages)</label>
+            <textarea name="travelers" rows="3" placeholder="e.g., John Smith (45), Jane Smith (42), Emily Smith (12)"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Passport Status</label>
+            <select name="passport_status">
+              <option value="">Select...</option>
+              <option value="all_valid">All travelers have valid passports</option>
+              <option value="some_expired">Some passports expired or expiring soon</option>
+              <option value="none">No passports yet</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Dietary or Medical Restrictions</label>
+            <textarea name="restrictions" rows="2" placeholder="e.g., vegetarian, gluten-free, wheelchair accessible"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Airline Loyalty Programs</label>
+            <input type="text" name="airline_loyalty" placeholder="e.g., Delta SkyMiles #123456" />
+          </div>
+
+          <div class="form-group">
+            <label>Hotel Loyalty Programs</label>
+            <input type="text" name="hotel_loyalty" placeholder="e.g., Marriott Bonvoy #987654" />
+          </div>
+
+          <div class="form-group">
+            <label>Preferred Contact Method</label>
+            <select name="contact_method">
+              <option value="email">Email</option>
+              <option value="phone">Phone</option>
+              <option value="either">Either</option>
+            </select>
+          </div>
+        </details>
+
+        <button type="submit" class="primary-action" style="margin-top: 25px; width: 100%;">
+          Submit Quote Request
+        </button>
+      </form>
+
+      <div id="submissionConfirmation" class="hidden" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 4rem; margin-bottom: 20px;">✅</div>
+        <h3 style="color: #667eea; margin-bottom: 15px;">Quote Request Submitted!</h3>
+        <p style="color: #666; margin-bottom: 25px;">A travel professional will contact you within 24 hours.</p>
+        <button onclick="closeTravelerIntake()" class="primary-action">Close</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>
