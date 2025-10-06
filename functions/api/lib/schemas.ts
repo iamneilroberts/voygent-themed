@@ -18,9 +18,17 @@ export function validateIntake(data: any): boolean {
     if (!Array.isArray(data.activities) || data.activities.length === 0) return false;
   }
 
-  // Common required fields
-  if (!data.party || typeof data.party !== 'object') return false;
-  if (typeof data.party.adults !== 'number' || data.party.adults < 1) return false;
+  // Common required fields - apply defaults if missing
+  if (!data.party || typeof data.party !== 'object') {
+    data.party = { adults: 2, children: [], accessibility: 'none' };
+  }
+  if (typeof data.party.adults !== 'number' || data.party.adults < 1) {
+    data.party.adults = 2; // Default to 2 adults
+  }
+  if (!Array.isArray(data.party.children)) {
+    data.party.children = [];
+  }
+
   return true;
 }
 
