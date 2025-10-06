@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: Voygent API - Cost Estimation
+  description: Trip cost estimation with commission headroom calculation
+  version: 1.0.0
+  contact:
+    name: Voygent Heritage MVP
+
+servers:
+  - url: https://voygent-heritage-mvp.pages.dev/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /estimate/cost:
+    post:
+      summary: Estimate trip cost
+      description: |
+        Combines airfare + hotels + tours + transport into per-person USD range.
+        Applies 10-15% commission headroom to top of range only.
+        Stores result in trip record for later retrieval.
+      operationId: estimateCost
+      tags:
+        - Estimation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostEstimateRequest'
+            example:
+              trip_id: abc123
+              airfare:
+                price_low: 850
+                price_high: 1350
+              hotels:
+                - city: Edinburgh
+                  nights: 3
+                  nightly_low: 120
+                  nightly_high: 180
+                - city: Isle of Skye
+                  nights: 2
+                  nightly_low: 100
+                  nightly_high: 150
+              tours:
+                - name: Clan MacLeod Heritage Tour
+                  price_low: 150
+                  price_high: 250
+                - name: Edinburgh Castle Tour
+                  price_low: 30
+                  price_high: 50
+              transport:
+                - type: train
+                  route: Edinburgh-Inverness
+                  price_low: 50
+                  price_high: 80
+                - type: car_rental
+                  days: 3
+                  price_low: 100
+                  price_high: 150
+      responses:
+        '200':
+          description: Cost estimate calculated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEstimateResponse'
+              example:
+                trip_id: abc123
+                airfare: [850, 1350]
+                hotels: [840, 1400]
+                tours: [180, 300]
+                transport: [150, 230]
+                subtotal: [2020, 3280]
+                total_per_person: [2020, 3772]
+                commission_included: true
+                commission_pct: 15
+                currency: USD
+                disclaimer: final quote by travel professional
+                estimate_date: '2025-10-05T12:00:00Z'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Invalid trip_id
+                details: Trip not found
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Cost calculation failed
+                details: Unable to compute cost estimate
+
+components:
+  schemas:
+    CostEstimateRequest:
+      type: object
+      required:
+        - trip_id
+        - airfare
+        - hotels
+      properties:
+        trip_id:
+          type: string
+          description: Heritage trip ID
+        airfare:
+          type: object
+          required:
+            - price_low
+            - price_high
+          properties:
+            price_low:
+              type: number
+              format: float
+              description: Low airfare estimate (USD)
+            price_high:
+              type: number
+              format: float
+              description: High airfare estimate (USD)
+        hotels:
+          type: array
+          items:
+            $ref: '#/components/schemas/HotelCostInput'
+          minItems: 1
+        tours:
+          type: array
+          items:
+            $ref: '#/components/schemas/TourCostInput'
+          description: Optional tour costs
+        transport:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransportCostInput'
+          description: Optional ground transport costs
+        commission_pct:
+          type: number
+          format: float
+          minimum: 10
+          maximum: 15
+          default: 15
+          description: Commission percentage (10-15%)
+
+    HotelCostInput:
+      type: object
+      required:
+        - city
+        - nights
+        - nightly_low
+        - nightly_high
+      properties:
+        city:
+          type: string
+        nights:
+          type: integer
+          minimum: 1
+        nightly_low:
+          type: number
+          format: float
+          description: Low nightly rate (USD)
+        nightly_high:
+          type: number
+          format: float
+          description: High nightly rate (USD)
+
+    TourCostInput:
+      type: object
+      required:
+        - name
+        - price_low
+        - price_high
+      properties:
+        name:
+          type: string
+        price_low:
+          type: number
+          format: float
+        price_high:
+          type: number
+          format: float
+
+    TransportCostInput:
+      type: object
+      required:
+        - type
+        - price_low
+        - price_high
+      properties:
+        type:
+          type: string
+          enum: [train, car_rental, driver, taxi, bus]
+        route:
+          type: string
+          description: Route or description (optional)
+        days:
+          type: integer
+          description: Number of days (for car rental)
+        price_low:
+          type: number
+          format: float
+        price_high:
+          type: number
+          format: float
+
+    CostEstimateResponse:
+      type: object
+      required:
+        - trip_id
+        - airfare
+        - hotels
+        - tours
+        - transport
+        - subtotal
+        - total_per_person
+        - commission_included
+        - currency
+        - disclaimer
+        - estimate_date
+      properties:
+        trip_id:
+          type: string
+        airfare:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high] airfare range'
+        hotels:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high] total hotel costs'
+        tours:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high] tour costs'
+        transport:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high] transport costs'
+        subtotal:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high] subtotal before commission'
+        total_per_person:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 2
+          maxItems: 2
+          description: '[low, high_with_commission] total per person'
+        commission_included:
+          type: boolean
+          description: Always true
+        commission_pct:
+          type: number
+          format: float
+          description: Commission percentage applied
+        currency:
+          type: string
+          description: Currency code
+          default: USD
+        disclaimer:
+          type: string
+          description: Cost estimate disclaimer
+          default: final quote by travel professional
+        estimate_date:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of estimate
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error context

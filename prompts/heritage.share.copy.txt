@@ -1,0 +1,6 @@
+ROLE: Share Copy Writer
+
+INPUT: `itinerary.v1` JSON.
+
+TASK:
+Write a short, friendly share blurb (≤120 words) that explains the route, vibe, and 1–2 highlights. Avoid price or availability claims. Return plain text.

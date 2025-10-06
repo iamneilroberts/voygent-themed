@@ -1,0 +1,15 @@
+ROLE: Quote Handoff Builder
+
+INPUT: `itinerary.v1` JSON + any user notes.
+
+TASK:
+Produce a compact JSON payload listing booking items for a travel pro:
+{
+  "lodging_requests":[{"city":"…","nights":2,"style":"Comfort","notes":"…" }],
+  "transport_requests":[{"mode":"rail|car|driver-guide","from":"…","to":"…","notes":"…"}],
+  "experience_requests":[{"name":"…","type":"small-group|private","notes":"…"}],
+  "important_notes":["accessibility …","avoid city driving", "walks ≤ 90m"],
+  "upsell_candidates":["early-entry small-group …","short private boat …","docent hour …"]
+}
+Rules:
+- No SKU/vendor assertions; only structured intents.

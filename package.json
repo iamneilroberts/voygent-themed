@@ -1,0 +1,17 @@
+{
+  "name": "voygent-heritage-mvp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev --compatibility-date=2024-01-01 --d1=DB",
+    "deploy": "wrangler pages deploy",
+    "db:init": "wrangler d1 create voygent-heritage-db",
+    "db:migrate": "wrangler d1 execute voygent-heritage-db --local --file=./migrations/001_init.sql",
+    "db:migrate:prod": "wrangler d1 execute voygent-heritage-db --remote --file=./migrations/001_init.sql"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "wrangler": "^3.28.0"
+  }
+}

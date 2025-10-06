@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://voygent.com/schemas/flight-offer.v1.json",
+  "title": "Flight Offer",
+  "description": "Airfare pricing data from provider APIs (Amadeus primary, Kiwi fallback)",
+  "type": "object",
+  "required": [
+    "route",
+    "origin_iata",
+    "destination_iata",
+    "price_low",
+    "price_median",
+    "provider",
+    "estimate_date",
+    "route_type"
+  ],
+  "properties": {
+    "route": {
+      "type": "string",
+      "description": "Route in format 'XXX-YYY round-trip'",
+      "pattern": "^[A-Z]{3}-[A-Z]{3} (round-trip|one-way|multi-city)$",
+      "examples": ["JFK-EDI round-trip", "LAX-LHR one-way"]
+    },
+    "origin_iata": {
+      "type": "string",
+      "description": "3-letter origin airport code",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["JFK", "LAX", "ORD"]
+    },
+    "destination_iata": {
+      "type": "string",
+      "description": "3-letter destination airport code",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["EDI", "LHR", "CDG"]
+    },
+    "price_low": {
+      "type": "number",
+      "description": "Low fare estimate in USD",
+      "minimum": 0,
+      "examples": [850, 1200]
+    },
+    "price_median": {
+      "type": "number",
+      "description": "Median fare estimate in USD",
+      "minimum": 0,
+      "examples": [1100, 1500]
+    },
+    "price_high": {
+      "type": "number",
+      "description": "High fare estimate in USD (optional)",
+      "minimum": 0,
+      "examples": [1350, 1800]
+    },
+    "carrier": {
+      "type": "string",
+      "description": "Airline name or 'Multiple carriers'",
+      "examples": ["Delta", "United", "Multiple carriers"]
+    },
+    "provider": {
+      "type": "string",
+      "description": "Provider used for this estimate",
+      "enum": ["amadeus", "kiwi"]
+    },
+    "estimate_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of estimate (used for cache invalidation)"
+    },
+    "route_type": {
+      "type": "string",
+      "enum": ["round_trip", "one_way", "multi_city"]
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "price_low must be less than price_median",
+      "if": {
+        "properties": {
+          "price_low": { "type": "number" },
+          "price_median": { "type": "number" }
+        }
+      },
+      "then": {
+        "properties": {
+          "price_low": { "maximum": { "$data": "1/price_median" } }
+        }
+      }
+    },
+    {
+      "description": "price_median must be less than price_high if present",
+      "if": {
+        "properties": {
+          "price_median": { "type": "number" },
+          "price_high": { "type": "number" }
+        },
+        "required": ["price_high"]
+      },
+      "then": {
+        "properties": {
+          "price_median": { "maximum": { "$data": "1/price_high" } }
+        }
+      }
+    }
+  ]
+}

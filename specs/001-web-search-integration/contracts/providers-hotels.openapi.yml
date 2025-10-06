@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: Voygent Provider API - Hotels
+  description: Hotel search with Amadeus primary, Serper.dev + Google Places fallback
+  version: 1.0.0
+  contact:
+    name: Voygent Heritage MVP
+
+servers:
+  - url: https://voygent-heritage-mvp.pages.dev/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /providers/hotels:
+    get:
+      summary: Search hotel listings
+      description: |
+        Returns 2-3 hotel examples per city matching budget tier.
+        Uses Amadeus Hotel Search as primary, falls back to Serper.dev (Google Hotels) + Google Places enrichment.
+        Results cached for 24 hours in D1.
+      operationId: searchHotels
+      tags:
+        - Providers
+      parameters:
+        - name: city
+          in: query
+          required: true
+          description: Destination city name
+          schema:
+            type: string
+            minLength: 2
+            example: Edinburgh
+        - name: checkin
+          in: query
+          required: true
+          description: Check-in date in YYYY-MM-DD format
+          schema:
+            type: string
+            format: date
+            example: '2025-06-15'
+        - name: nights
+          in: query
+          required: true
+          description: Number of nights
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 30
+            example: 3
+        - name: luxury
+          in: query
+          required: false
+          description: Budget tier preference (default comfort)
+          schema:
+            type: string
+            enum: [budget, comfort, premium, luxury]
+            default: comfort
+        - name: adults
+          in: query
+          required: false
+          description: Number of adults (default 2)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+            default: 2
+      responses:
+        '200':
+          description: Hotel listings found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HotelListingsResponse'
+              examples:
+                amadeus_success:
+                  summary: Successful Amadeus response
+                  value:
+                    provider: amadeus
+                    city: Edinburgh
+                    checkin: '2025-06-15'
+                    nights: 3
+                    hotels:
+                      - hotel_id: AMEDIN123
+                        name: Heritage Inn Edinburgh
+                        nightly_price_low: 120
+                        nightly_price_high: 180
+                        star_rating: 4
+                        budget_tier: comfort
+                        availability_disclaimer: availability not guaranteed
+                      - hotel_id: AMEDIN456
+                        name: Royal Mile Suites
+                        nightly_price_low: 150
+                        nightly_price_high: 220
+                        star_rating: 4.5
+                        budget_tier: premium
+                        availability_disclaimer: availability not guaranteed
+                    cached: false
+                serper_fallback:
+                  summary: Serper.dev + Google Places fallback
+                  value:
+                    provider: serper
+                    city: Edinburgh
+                    checkin: '2025-06-15'
+                    nights: 3
+                    hotels:
+                      - hotel_id: ChIJa1b2c3d4h0gRz
+                        name: Old Town Chambers
+                        nightly_price_low: 110
+                        nightly_price_high: 160
+                        star_rating: 4.2
+                        budget_tier: comfort
+                        booking_reference: https://www.google.com/travel/hotels/...
+                        availability_disclaimer: availability not guaranteed
+                    cached: false
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Invalid date format
+                details: 'checkin' must be YYYY-MM-DD
+        '404':
+          description: No hotels found matching criteria
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: No hotels found
+                details: Limited availability in Edinburgh - travel pro will find alternatives
+        '500':
+          description: Provider API failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Provider unavailable
+                details: Both Amadeus and Serper APIs failed
+        '504':
+          description: Request timeout (>10s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Timeout
+                details: Hotel search exceeded 10 second threshold
+
+components:
+  schemas:
+    HotelListingsResponse:
+      type: object
+      required:
+        - provider
+        - city
+        - checkin
+        - nights
+        - hotels
+        - cached
+      properties:
+        provider:
+          type: string
+          enum: [amadeus, serper, google_places]
+          description: Provider used for this search
+        city:
+          type: string
+          description: Destination city
+        checkin:
+          type: string
+          format: date
+        nights:
+          type: integer
+        hotels:
+          type: array
+          items:
+            $ref: '#/components/schemas/HotelListing'
+          minItems: 1
+          maxItems: 3
+          description: 2-3 hotel examples per city
+        cached:
+          type: boolean
+          description: Whether result was served from cache
+        cache_age_seconds:
+          type: integer
+          description: Age of cached result (omitted if cached=false)
+
+    HotelListing:
+      type: object
+      required:
+        - hotel_id
+        - name
+        - nightly_price_low
+        - nightly_price_high
+        - budget_tier
+        - availability_disclaimer
+      properties:
+        hotel_id:
+          type: string
+          description: Provider's hotel identifier
+        name:
+          type: string
+          description: Hotel name
+        city:
+          type: string
+          description: Location city (optional, inherited from parent)
+        nightly_price_low:
+          type: number
+          format: float
+          description: Minimum nightly rate in USD
+        nightly_price_high:
+          type: number
+          format: float
+          description: Maximum nightly rate in USD
+        star_rating:
+          type: number
+          format: float
+          minimum: 1
+          maximum: 5
+          description: Star rating (optional)
+        budget_tier:
+          type: string
+          enum: [budget, comfort, premium, luxury]
+          description: Budget tier classification
+        provider:
+          type: string
+          enum: [amadeus, serper, google_places]
+          description: Source provider (optional, inherited from parent)
+        booking_reference:
+          type: string
+          format: uri
+          description: External booking link (optional)
+        availability_disclaimer:
+          type: string
+          description: Availability disclaimer
+          default: availability not guaranteed
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error context

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "intake.v1",
+  "type": "object",
+  "properties": {
+    "surnames": { "type": "array", "items": { "type": "string" } },
+    "suspected_origins": { "type": "array", "items": { "type": "string" } },
+    "immigration_window": { "type": ["string","null"] },
+    "party": {
+      "type": "object",
+      "properties": {
+        "adults": { "type": "integer" },
+        "children": { "type": "array", "items": { "type": "integer" } },
+        "accessibility": { "type": "string" }
+      },
+      "required": ["adults"]
+    },
+    "duration_days": { "type": ["integer","null"] },
+    "target_month": { "type": ["string","null"] },
+    "departure_airport": {
+      "type": ["string","null"],
+      "description": "Departure airport IATA code or city name",
+      "examples": ["JFK", "LAX", "New York"]
+    },
+    "transport": {
+      "type": "object",
+      "properties": {
+        "rail": { "type": "boolean" },
+        "car_ok": { "type": "boolean" },
+        "driver_guide_ok": { "type": "boolean" }
+      }
+    },
+    "transport_pref": {
+      "type": ["string","null"],
+      "description": "Transport preference for trip",
+      "enum": ["train", "car", "mixed", "driver", null]
+    },
+    "luxury_level": { "type": ["string","null"] },
+    "hotel_type": {
+      "type": ["string","null"],
+      "description": "Hotel type / budget tier preference",
+      "enum": ["budget", "comfort", "premium", "luxury", null]
+    },
+    "activity_level": { "type": ["string","null"] },
+    "interests": { "type": "array", "items": { "type": "string" } },
+    "ancestry_context": {
+      "type": "object",
+      "description": "Extracted genealogy data from uploaded documents/URLs",
+      "properties": {
+        "surnames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Family surnames extracted from genealogy sources"
+        },
+        "origins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Suspected ancestral origins"
+        },
+        "migration_window": {
+          "type": ["string","null"],
+          "description": "Immigration/migration period (e.g., '1880-1920')"
+        },
+        "key_sites": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Important ancestral locations (churches, archives, monuments)"
+        },
+        "sources": {
+          "type": "array",
+          "description": "Individual genealogy data sources",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["url", "pdf", "image", "text"],
+                "description": "Source type"
+              },
+              "value": {
+                "type": "string",
+                "description": "URL or filename"
+              },
+              "raw_content": {
+                "type": ["string","null"],
+                "description": "Original uploaded text/OCR output"
+              },
+              "parsed_data": {
+                "type": "object",
+                "description": "Structured extraction (surnames, places, dates)"
+              },
+              "ocr_summary": {
+                "type": ["string","null"],
+                "description": "OCR processing notes"
+              },
+              "web_search_context": {
+                "type": ["string","null"],
+                "description": "Related web search findings"
+              }
+            },
+            "required": ["kind", "value"]
+          }
+        },
+        "web_search_summary": {
+          "type": ["string","null"],
+          "description": "Summary of surname + region history research"
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": { "kind": { "type": "string" }, "value": { "type": "string" }, "notes": { "type": "string" } },
+        "required": ["kind","value"]
+      }
+    },
+    "notes": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["surnames","party"]
+}

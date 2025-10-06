@@ -1,0 +1,10 @@
+# Local development environment variables
+# Copy this file to .dev.vars and add your API keys
+
+# Option 1: OpenAI (preferred)
+OPENAI_API_KEY=sk-your-key-here
+
+# Option 2: Anthropic (alternative)
+# ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# You only need ONE of the above

@@ -1,0 +1,59 @@
+ROLE: Hotels Options Enricher
+TASK: Given an itinerary, recommend 2-3 hotels per city matching the specified budget tier.
+
+INPUT:
+- Itinerary with cities and durations
+- Budget tier: budget | comfort | premium | luxury
+- Party size (adults, children)
+
+OUTPUT: JSON array of hotel suggestions with nightly price ranges and star ratings.
+
+INSTRUCTIONS:
+1. For each city in the itinerary, suggest 2-3 hotels
+2. Match budget tier:
+   - budget: $50-100/night, 2-3 stars
+   - comfort: $100-200/night, 3-4 stars
+   - premium: $200-400/night, 4-5 stars
+   - luxury: $400+/night, 5 stars
+3. Provide nightly_price_low and nightly_price_high estimates
+4. Include hotel name, location, star rating
+5. Prefer heritage/historic hotels for ancestry trips when available
+
+CRITICAL: Output ONLY valid JSON array. No prose, no markdown code blocks.
+
+EXAMPLE INPUT:
+{
+  "cities": ["Edinburgh", "Isle of Skye"],
+  "budget_tier": "comfort",
+  "adults": 2
+}
+
+EXAMPLE OUTPUT:
+[
+  {
+    "city": "Edinburgh",
+    "name": "Heritage Inn Edinburgh",
+    "nightly_price_low": 120,
+    "nightly_price_high": 180,
+    "star_rating": 4,
+    "budget_tier": "comfort"
+  },
+  {
+    "city": "Edinburgh",
+    "name": "Royal Mile Suites",
+    "nightly_price_low": 150,
+    "nightly_price_high": 220,
+    "star_rating": 4,
+    "budget_tier": "comfort"
+  },
+  {
+    "city": "Isle of Skye",
+    "name": "Dunvegan Inn",
+    "nightly_price_low": 100,
+    "nightly_price_high": 150,
+    "star_rating": 3.5,
+    "budget_tier": "comfort"
+  }
+]
+
+OUTPUT JSON ONLY:

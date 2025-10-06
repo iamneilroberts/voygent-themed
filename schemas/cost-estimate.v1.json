@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://voygent.com/schemas/cost-estimate.v1.json",
+  "title": "Cost Estimate",
+  "description": "Comprehensive trip cost breakdown with commission headroom (10-15% on top of range)",
+  "type": "object",
+  "required": [
+    "airfare",
+    "hotels",
+    "tours",
+    "transport",
+    "total_per_person",
+    "commission_included",
+    "currency",
+    "disclaimer",
+    "estimate_date"
+  ],
+  "properties": {
+    "airfare": {
+      "type": "array",
+      "description": "[low, high] airfare range in USD",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "hotels": {
+      "type": "array",
+      "description": "[low, high] total hotel costs across all nights",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "tours": {
+      "type": "array",
+      "description": "[low, high] estimated tour/activity costs",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "transport": {
+      "type": "array",
+      "description": "[low, high] ground transport estimate",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "total_per_person": {
+      "type": "array",
+      "description": "[low, high_with_commission] grand total per person. High includes 10-15% commission headroom: Math.ceil(subtotal_high * (1 + commission_pct/100))",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "commission_included": {
+      "type": "boolean",
+      "description": "Always true - indicates commission is baked into total_per_person[1]",
+      "const": true
+    },
+    "commission_pct": {
+      "type": "number",
+      "description": "Commission percentage applied (10-15%)",
+      "minimum": 10,
+      "maximum": 15
+    },
+    "currency": {
+      "type": "string",
+      "description": "Currency code",
+      "default": "USD",
+      "enum": ["USD"]
+    },
+    "disclaimer": {
+      "type": "string",
+      "description": "Cost estimate disclaimer",
+      "default": "final quote by travel professional"
+    },
+    "estimate_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of estimate"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voygent Admin - Theme Builder</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f8f9fa;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h1 { font-size: 2rem; margin-bottom: 10px; }
+    .admin-section {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+    }
+    input[type="text"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    textarea {
+      min-height: 150px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .button-danger {
+      background: linear-gradient(135deg, #f5576c 0%, #c81d25 100%);
+    }
+    .button-outline {
+      background: white;
+      color: #c81d25;
+      border: 2px solid #c81d25;
+    }
+    .button-outline:hover {
+      color: white;
+      background: #c81d25;
+    }
+    .ai-button {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .code-output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      color: #667eea;
+    }
+    .loading.show {
+      display: block;
+    }
+    .existing-themes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .theme-card {
+      background: #f8f9fa;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .theme-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+    }
+    .theme-card.selected {
+      border-color: #667eea;
+      background: #f0f4ff;
+    }
+    .field-list {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .field-tag {
+      background: #e0e7ff;
+      color: #667eea;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .field-tag button {
+      background: transparent;
+      color: #667eea;
+      padding: 0;
+      font-size: 1.2rem;
+      line-height: 1;
+      min-width: auto;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🛠️ Voygent Admin - Theme Builder</h1>
+    <p style="opacity: 0.9;">Create and manage trip themes with AI assistance</p>
+  </header>
+
+  <div class="container">
+    <!-- Quick Create with AI -->
+    <div class="admin-section" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+      <h2 style="color: white;">🤖 Quick Create with AI</h2>
+      <p style="opacity: 0.95; margin-bottom: 20px;">Describe your theme idea in natural language and let AI build the complete configuration for you!</p>
+
+      <div class="form-group">
+        <label style="color: white; font-weight: 700;">Describe Your Theme</label>
+        <textarea
+          id="themeDescriptionInput"
+          placeholder="Example: I want a theme for travelers interested in visiting UNESCO World Heritage sites. They should be able to specify which regions or types of sites they're interested in (cultural, natural, mixed), their expertise level in history/architecture, and whether they want guided tours. The trips should focus on educational experiences with expert guides and access to restricted areas."
+          style="min-height: 120px; background: white; color: #333;"
+        ></textarea>
+        <small style="color: white; opacity: 0.9;">Be specific about what travelers would want to do, what preferences they'd have, and what makes this theme unique.</small>
+      </div>
+
+      <div class="button-group">
+        <button onclick="buildThemeWithAI()" style="background: white; color: #f5576c; font-weight: 600;">
+          ✨ Build Theme with AI
+        </button>
+        <button onclick="clearForm()" style="background: rgba(255,255,255,0.2); color: white;">
+          🔄 Clear Form
+        </button>
+      </div>
+
+      <div id="aiLoading" class="loading" style="color: white;">
+        <p>🤖 AI is building your theme...</p>
+        <p style="font-size: 0.9rem; opacity: 0.8;">This may take 10-15 seconds</p>
+      </div>
+    </div>
+
+    <!-- Existing Themes -->
+    <div class="admin-section">
+      <h2>Existing Themes</h2>
+      <p style="color: #666; margin-bottom: 15px;">Click a theme to load and edit it</p>
+      <div id="existingThemes" class="existing-themes"></div>
+    </div>
+
+    <!-- Theme Builder Form -->
+    <div class="admin-section">
+      <h2>Theme Configuration</h2>
+
+      <div class="form-group">
+        <label for="themeId">Theme ID *</label>
+        <input type="text" id="themeId" placeholder="e.g., wellness, sports, music" required>
+        <small style="color: #888;">Lowercase, no spaces. Used as the unique identifier.</small>
+      </div>
+
+      <div class="form-group">
+        <label for="themeName">Theme Name *</label>
+        <input type="text" id="themeName" placeholder="e.g., Wellness & Spa, Sports Tourism" required>
+      </div>
+
+      <div class="form-group">
+        <label for="themeDescription">Description *</label>
+        <input type="text" id="themeDescription" placeholder="e.g., Relax and rejuvenate at world-class spas" required>
+      </div>
+
+      <div class="form-group">
+        <label for="themeIcon">Icon (emoji) *</label>
+        <input type="text" id="themeIcon" placeholder="e.g., 🧘 or 🏃 or 🎵" maxlength="2" required>
+      </div>
+
+      <div class="form-group">
+        <label>Required Fields</label>
+        <div id="requiredFieldsList" class="field-list"></div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <input type="text" id="newRequiredField" placeholder="Add required field (e.g., destinations, activities)">
+          <button type="button" onclick="addRequiredField()">Add</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Optional Fields</label>
+        <div id="optionalFieldsList" class="field-list"></div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <input type="text" id="newOptionalField" placeholder="Add optional field (e.g., budget, duration)">
+          <button type="button" onclick="addOptionalField()">Add</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="exampleInputs">Example Inputs (one per line)</label>
+        <textarea id="exampleInputs" placeholder="Hot springs tour Japan, 2 weeks&#10;Yoga retreat Bali, 10 days&#10;Spa weekend Tuscany"></textarea>
+      </div>
+
+      <div class="button-group">
+        <button type="button" onclick="saveTheme()">💾 Save Theme</button>
+        <button type="button" class="button-danger" onclick="deactivateTheme()">🛑 Deactivate Theme</button>
+        <button type="button" class="button-outline" onclick="deleteTheme()">🗑️ Delete Theme</button>
+      </div>
+    </div>
+
+    <!-- AI Prompt Generation -->
+    <div class="admin-section">
+      <h2>AI Prompt Generation</h2>
+      <p style="color: #666; margin-bottom: 20px;">Let AI help you write the intake and options prompts based on your theme configuration.</p>
+
+      <div class="button-group">
+        <button class="ai-button" onclick="generateIntakePrompt()">✨ Generate Intake Prompt</button>
+        <button class="ai-button" onclick="generateOptionsPrompt()">✨ Generate Options Prompt</button>
+        <button class="ai-button" onclick="generateBothPrompts()">✨ Generate Both Prompts</button>
+      </div>
+
+      <div id="loading" class="loading">
+        <p>🤖 AI is thinking...</p>
+      </div>
+
+      <div class="form-group" style="margin-top: 30px;">
+        <label for="intakePrompt">Intake Normalizer Prompt *</label>
+        <textarea id="intakePrompt" rows="15" placeholder="Will be generated by AI or you can write it manually..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="optionsPrompt">Options Generator Prompt *</label>
+        <textarea id="optionsPrompt" rows="8" placeholder="Will be generated by AI or you can write it manually..."></textarea>
+      </div>
+    </div>
+
+    <!-- Generated Code -->
+    <div class="admin-section">
+      <h2>Generated TypeScript Code</h2>
+      <p style="color: #666; margin-bottom: 15px;">Copy this code and add it to <code>functions/api/lib/trip-templates.ts</code></p>
+
+      <button onclick="generateCode()">🔄 Generate Code</button>
+
+      <div id="generatedCode" class="code-output">
+        // Click "Generate Code" to see the TypeScript template definition
+      </div>
+
+      <button onclick="copyCode()" style="margin-top: 15px;">📋 Copy to Clipboard</button>
+    </div>
+  </div>
+
+  <script>
+    let requiredFields = [];
+    let optionalFields = [];
+    let existingThemes = [];
+    let selectedThemeId = null;
+
+    // Build theme from free text description
+    async function buildThemeWithAI() {
+      const description = document.getElementById('themeDescriptionInput').value.trim();
+
+      if (!description || description.length < 10) {
+        alert('Please provide a detailed description of your theme (at least 10 characters)');
+        return;
+      }
+
+      const loading = document.getElementById('aiLoading');
+      loading.classList.add('show');
+
+      try {
+        const response = await fetch('/api/admin/build-theme', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description })
+        });
+
+        const theme = await response.json();
+
+        if (!response.ok) {
+          throw new Error(theme.error || 'Failed to build theme');
+        }
+
+        // Populate all form fields with AI-generated data
+        document.getElementById('themeId').value = theme.id;
+        document.getElementById('themeName').value = theme.name;
+        document.getElementById('themeDescription').value = theme.description;
+        document.getElementById('themeIcon').value = theme.icon;
+        document.getElementById('intakePrompt').value = theme.intakePrompt;
+        document.getElementById('optionsPrompt').value = theme.optionsPrompt;
+        document.getElementById('exampleInputs').value = theme.exampleInputs.join('\n');
+
+        // Set required and optional fields
+        requiredFields = [...(theme.requiredFields || [])];
+        optionalFields = [...(theme.optionalFields || [])];
+        updateFieldsList('requiredFieldsList', requiredFields, 'requiredFields');
+        updateFieldsList('optionalFieldsList', optionalFields, 'optionalFields');
+
+        selectedThemeId = null;
+        renderExistingThemes();
+
+        // Scroll to configuration section
+        setTimeout(() => {
+          document.querySelector('.admin-section:nth-child(3)').scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+
+        alert('✅ Theme built successfully! Review and edit the fields below, then generate the code.');
+      } catch (error) {
+        alert('Failed to build theme: ' + error.message);
+      } finally {
+        loading.classList.remove('show');
+      }
+    }
+
+    // Clear the form
+    function clearForm() {
+      document.getElementById('themeDescriptionInput').value = '';
+      document.getElementById('themeId').value = '';
+      document.getElementById('themeName').value = '';
+      document.getElementById('themeDescription').value = '';
+      document.getElementById('themeIcon').value = '';
+      document.getElementById('intakePrompt').value = '';
+      document.getElementById('optionsPrompt').value = '';
+      document.getElementById('exampleInputs').value = '';
+      requiredFields = [];
+      optionalFields = [];
+      updateFieldsList('requiredFieldsList', requiredFields, 'requiredFields');
+      updateFieldsList('optionalFieldsList', optionalFields, 'optionalFields');
+      document.getElementById('generatedCode').textContent = '// Click "Generate Code" to see the TypeScript template definition';
+      selectedThemeId = null;
+      renderExistingThemes();
+    }
+
+    // Load existing themes
+    async function loadExistingThemes() {
+      try {
+        const response = await fetch('/api/templates');
+        const data = await response.json();
+        existingThemes = data.templates || [];
+        const availableIds = new Set(existingThemes.map(theme => theme.id));
+        if (selectedThemeId && !availableIds.has(selectedThemeId)) {
+          selectedThemeId = null;
+        }
+        renderExistingThemes();
+      } catch (error) {
+        console.error('Failed to load themes:', error);
+      }
+    }
+
+    function renderExistingThemes() {
+      const container = document.getElementById('existingThemes');
+      if (!container) return;
+
+      if (existingThemes.length === 0) {
+        container.innerHTML = '<div style="color: #666; font-size: 0.9rem;">No themes found yet. Save one to get started.</div>';
+        return;
+      }
+
+      container.innerHTML = existingThemes.map(theme => `
+        <div class="theme-card${selectedThemeId === theme.id ? ' selected' : ''}" data-theme="${theme.id}">
+          <div style="font-size: 2rem; margin-bottom: 8px;">${theme.icon}</div>
+          <div style="font-weight: 600;">${theme.name}</div>
+          <div style="font-size: 0.85rem; color: #666; margin-top: 4px;">${theme.description}</div>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('.theme-card').forEach(card => {
+        card.onclick = () => {
+          const themeId = card.getAttribute('data-theme');
+          if (themeId) {
+            loadTheme(themeId);
+          }
+        };
+      });
+    }
+
+    // Load theme for editing
+    async function loadTheme(themeId) {
+      try {
+        const response = await fetch(`/api/templates/${themeId}`);
+        const theme = await response.json();
+
+        if (!response.ok) {
+          alert('Failed to load theme: ' + (theme.error || 'Unknown error'));
+          return;
+        }
+
+        // Populate form fields
+        document.getElementById('themeId').value = theme.id;
+        document.getElementById('themeName').value = theme.name;
+        document.getElementById('themeDescription').value = theme.description;
+        document.getElementById('themeIcon').value = theme.icon;
+        document.getElementById('intakePrompt').value = theme.intakePrompt;
+        document.getElementById('optionsPrompt').value = theme.optionsPrompt;
+        document.getElementById('exampleInputs').value = theme.exampleInputs.join('\n');
+
+        // Set required and optional fields
+        requiredFields = [...(theme.requiredFields || [])];
+        optionalFields = [...(theme.optionalFields || [])];
+        updateFieldsList('requiredFieldsList', requiredFields, 'requiredFields');
+        updateFieldsList('optionalFieldsList', optionalFields, 'optionalFields');
+
+        selectedThemeId = theme.id;
+        renderExistingThemes();
+
+        // Scroll to form
+        document.querySelector('.admin-section h2').scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        alert('Failed to load theme: ' + error.message);
+      }
+    }
+
+    function addRequiredField() {
+      const input = document.getElementById('newRequiredField');
+      const field = input.value.trim();
+      if (field && !requiredFields.includes(field)) {
+        requiredFields.push(field);
+        updateFieldsList('requiredFieldsList', requiredFields, 'requiredFields');
+        input.value = '';
+      }
+    }
+
+    function addOptionalField() {
+      const input = document.getElementById('newOptionalField');
+      const field = input.value.trim();
+      if (field && !optionalFields.includes(field)) {
+        optionalFields.push(field);
+        updateFieldsList('optionalFieldsList', optionalFields, 'optionalFields');
+        input.value = '';
+      }
+    }
+
+    function updateFieldsList(containerId, fields, arrayName) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = fields.map((field, idx) => `
+        <div class="field-tag">
+          ${field}
+          <button onclick="removeField('${arrayName}', ${idx})" title="Remove">×</button>
+        </div>
+      `).join('');
+    }
+
+    function removeField(arrayName, index) {
+      if (arrayName === 'requiredFields') {
+        requiredFields.splice(index, 1);
+        updateFieldsList('requiredFieldsList', requiredFields, 'requiredFields');
+      } else {
+        optionalFields.splice(index, 1);
+        updateFieldsList('optionalFieldsList', optionalFields, 'optionalFields');
+      }
+    }
+
+    async function generateIntakePrompt() {
+      await generatePrompt('intake');
+    }
+
+    async function generateOptionsPrompt() {
+      await generatePrompt('options');
+    }
+
+    async function generateBothPrompts() {
+      await generatePrompt('both');
+    }
+
+    async function generatePrompt(type) {
+      const themeId = document.getElementById('themeId').value.trim();
+      const themeName = document.getElementById('themeName').value.trim();
+      const themeDescription = document.getElementById('themeDescription').value.trim();
+
+      if (!themeId || !themeName || !themeDescription) {
+        alert('Please fill in Theme ID, Name, and Description first');
+        return;
+      }
+
+      const loading = document.getElementById('loading');
+      loading.classList.add('show');
+
+      try {
+        const response = await fetch('/api/admin/generate-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type,
+            theme: {
+              id: themeId,
+              name: themeName,
+              description: themeDescription,
+              requiredFields,
+              optionalFields
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        if (type === 'intake' || type === 'both') {
+          document.getElementById('intakePrompt').value = data.intakePrompt || data.intake;
+        }
+        if (type === 'options' || type === 'both') {
+          document.getElementById('optionsPrompt').value = data.optionsPrompt || data.options;
+        }
+      } catch (error) {
+        alert('Failed to generate prompt: ' + error.message);
+      } finally {
+        loading.classList.remove('show');
+      }
+    }
+
+    async function saveTheme() {
+      const themeId = document.getElementById('themeId').value.trim();
+      const themeName = document.getElementById('themeName').value.trim();
+      const themeDescription = document.getElementById('themeDescription').value.trim();
+      const themeIcon = document.getElementById('themeIcon').value.trim();
+      const intakePrompt = document.getElementById('intakePrompt').value.trim();
+      const optionsPrompt = document.getElementById('optionsPrompt').value.trim();
+      const exampleInputs = document.getElementById('exampleInputs').value.trim().split('\n').map(line => line.trim()).filter(Boolean);
+
+      if (!themeId || !themeName || !intakePrompt || !optionsPrompt) {
+        alert('Please fill in all required fields (ID, Name, Intake Prompt, Options Prompt)');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/templates/${encodeURIComponent(themeId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: themeId,
+            name: themeName,
+            description: themeDescription,
+            icon: themeIcon || '🧭',
+            intakePrompt,
+            optionsPrompt,
+            requiredFields,
+            optionalFields,
+            exampleInputs
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || error.details || 'Unknown error');
+        }
+
+        const saved = await response.json();
+        selectedThemeId = saved.id;
+
+        const summary = {
+          id: saved.id,
+          name: saved.name,
+          description: saved.description,
+          icon: saved.icon,
+          exampleInputs: saved.exampleInputs || []
+        };
+
+        const existingIndex = existingThemes.findIndex(theme => theme.id === summary.id);
+        if (existingIndex >= 0) {
+          existingThemes[existingIndex] = summary;
+        } else {
+          existingThemes.push(summary);
+        }
+
+        existingThemes.sort((a, b) => a.name.localeCompare(b.name));
+
+        renderExistingThemes();
+        alert('Theme saved successfully!');
+      } catch (error) {
+        alert('Failed to save theme: ' + error.message);
+      }
+    }
+
+    async function deactivateTheme() {
+      const themeId = selectedThemeId || document.getElementById('themeId').value.trim();
+      if (!themeId) {
+        alert('Select a saved theme before deactivating.');
+        return;
+      }
+
+      if (!confirm(`Deactivate theme "${themeId}"? It will no longer appear in the admin list.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/templates/${encodeURIComponent(themeId)}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || error.details || 'Unknown error');
+        }
+
+        existingThemes = existingThemes.filter(theme => theme.id !== themeId);
+        selectedThemeId = null;
+        renderExistingThemes();
+        clearForm();
+        alert('Theme deactivated.');
+      } catch (error) {
+        alert('Failed to deactivate theme: ' + error.message);
+      }
+    }
+
+    async function deleteTheme() {
+      const themeId = selectedThemeId || document.getElementById('themeId').value.trim();
+      if (!themeId) {
+        alert('Select a saved theme before deleting.');
+        return;
+      }
+
+      if (!confirm(`Permanently delete theme "${themeId}"? This cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/templates/${encodeURIComponent(themeId)}?hard=true`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || error.details || 'Unknown error');
+        }
+
+        existingThemes = existingThemes.filter(theme => theme.id !== themeId);
+        selectedThemeId = null;
+        renderExistingThemes();
+        clearForm();
+        alert('Theme deleted.');
+      } catch (error) {
+        alert('Failed to delete theme: ' + error.message);
+      }
+    }
+
+    function generateCode() {
+      const themeId = document.getElementById('themeId').value.trim();
+      const themeName = document.getElementById('themeName').value.trim();
+      const themeDescription = document.getElementById('themeDescription').value.trim();
+      const themeIcon = document.getElementById('themeIcon').value.trim();
+      const intakePrompt = document.getElementById('intakePrompt').value.trim();
+      const optionsPrompt = document.getElementById('optionsPrompt').value.trim();
+      const exampleInputs = document.getElementById('exampleInputs').value.trim().split('\n').filter(Boolean);
+
+      if (!themeId || !themeName || !intakePrompt || !optionsPrompt) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const code = `  ${themeId}: {
+    id: '${themeId}',
+    name: '${themeName}',
+    description: '${themeDescription}',
+    icon: '${themeIcon}',
+    intakePrompt: \`${intakePrompt}\`,
+    optionsPrompt: \`${optionsPrompt}\`,
+    requiredFields: ${JSON.stringify(requiredFields)},
+    optionalFields: ${JSON.stringify(optionalFields)},
+    exampleInputs: ${JSON.stringify(exampleInputs, null, 6).replace(/\n/g, '\n    ')}
+  }`;
+
+      document.getElementById('generatedCode').textContent = code;
+    }
+
+    function copyCode() {
+      const code = document.getElementById('generatedCode').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        alert('Code copied to clipboard!');
+      });
+    }
+
+    // Initialize
+    loadExistingThemes();
+  </script>
+</body>
+</html>

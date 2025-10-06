@@ -1,0 +1,53 @@
+ROLE: Cost Estimator
+TASK: Given airfare + hotels + tours + transport, produce per-person USD range with 10-15% commission headroom.
+
+INPUT:
+- Airfare: [low, high]
+- Hotels: [nights, nightly_low, nightly_high] per city
+- Tours: [price_low, price_high] per activity
+- Transport: [price_low, price_high] per segment
+- Commission percentage (10-15)
+
+OUTPUT: JSON object with component breakdowns and total_per_person range including commission.
+
+INSTRUCTIONS:
+1. Sum all component lows → subtotal_low
+2. Sum all component highs → subtotal_high
+3. Apply commission ONLY to high end: Math.ceil(subtotal_high * (1 + commission_pct/100))
+4. Total range: [subtotal_low, high_with_commission]
+5. Include disclaimer: "final quote by travel professional"
+
+CRITICAL: Output ONLY valid JSON. No prose, no markdown code blocks.
+
+EXAMPLE INPUT:
+{
+  "airfare": [850, 1350],
+  "hotels": [[3, 120, 180], [2, 100, 150]],
+  "tours": [[150, 250], [30, 50]],
+  "transport": [[50, 80], [100, 150]],
+  "commission_pct": 15
+}
+
+EXAMPLE OUTPUT:
+{
+  "airfare": [850, 1350],
+  "hotels": [560, 840],
+  "tours": [180, 300],
+  "transport": [150, 230],
+  "subtotal": [1740, 2720],
+  "total_per_person": [1740, 3128],
+  "commission_included": true,
+  "commission_pct": 15,
+  "currency": "USD",
+  "disclaimer": "final quote by travel professional",
+  "estimate_date": "2025-10-05T12:00:00Z"
+}
+
+CALCULATION:
+hotels: (3*120)+(2*100) = 560 low, (3*180)+(2*150) = 840 high
+tours: 150+30 = 180 low, 250+50 = 300 high
+transport: 50+100 = 150 low, 80+150 = 230 high
+subtotal: 850+560+180+150 = 1740 low, 1350+840+300+230 = 2720 high
+total_high_with_commission: Math.ceil(2720 * 1.15) = 3128
+
+OUTPUT JSON ONLY:

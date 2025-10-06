@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "itinerary.v1",
+  "type": "object",
+  "properties": {
+    "title": { "type": "string" },
+    "overview": { "type": "string" },
+    "days": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "d": { "type": "integer" },
+          "city": { "type": "string" },
+          "am": { "type": "string" },
+          "pm": { "type": "string" },
+          "eve": { "type": ["string","null"] },
+          "drive": { "type": ["string","null"] },
+          "rail": { "type": ["string","null"] },
+          "why": { "type": "string" }
+        },
+        "required": ["d","city","am","pm","why"]
+      }
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "lodging": { "type": "string", "enum": ["Backpack","Savvy","Comfort","Boutique","OccasionalLuxe"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["lodging"]
+    },
+    "assumptions": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["title","days","budget"]
+}

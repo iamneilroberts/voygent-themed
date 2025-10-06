@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: Voygent Provider API - Generic Web Search
+  description: Web search with Serper.dev primary, Tavily fallback
+  version: 1.0.0
+  contact:
+    name: Voygent Heritage MVP
+
+servers:
+  - url: https://voygent-heritage-mvp.pages.dev/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /providers/search:
+    get:
+      summary: Perform web search
+      description: |
+        Returns web search results for genealogy context and general queries.
+        Uses Serper.dev as primary provider, falls back to Tavily Search API.
+        Results cached for 7 days in D1 using city+topic+month composite key.
+      operationId: webSearch
+      tags:
+        - Providers
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (e.g., "McLeod surname Isle of Skye history")
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 200
+            example: McLeod surname Isle of Skye history
+        - name: city
+          in: query
+          required: false
+          description: City filter for location-specific results
+          schema:
+            type: string
+            example: Edinburgh
+        - name: month
+          in: query
+          required: false
+          description: Month filter in YYYY-MM format
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            example: 2025-06
+        - name: max_results
+          in: query
+          required: false
+          description: Maximum number of results (default 10)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Search results found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              examples:
+                serper_success:
+                  summary: Successful Serper.dev response
+                  value:
+                    provider: serper
+                    query: McLeod surname Isle of Skye history
+                    cache_key: skye_mcleod_2025-06
+                    results:
+                      - title: Clan MacLeod - Wikipedia
+                        url: https://en.wikipedia.org/wiki/Clan_MacLeod
+                        snippet: The Clan MacLeod is a Highland Scottish clan associated with the Isle of Skye...
+                        position: 1
+                      - title: MacLeod Castle & Dunvegan
+                        url: https://www.dunvegancastle.com/clan-macleod
+                        snippet: Dunvegan Castle has been the ancestral home of the Chiefs of MacLeod for 800 years...
+                        position: 2
+                    cached: false
+                    search_date: '2025-10-05T12:00:00Z'
+                tavily_fallback:
+                  summary: Tavily Search API fallback
+                  value:
+                    provider: tavily
+                    query: Roberts surname North Wales history
+                    cache_key: wales_roberts_2025-06
+                    results:
+                      - title: Welsh Surnames - Roberts Family History
+                        url: https://www.wales.com/surnames/roberts
+                        snippet: Roberts is one of the most common Welsh patronymic surnames, meaning 'son of Robert'...
+                        relevance_score: 0.95
+                    cached: false
+                    search_date: '2025-10-05T12:05:00Z'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Invalid query
+                details: Query must be 3-200 characters
+        '500':
+          description: Provider API failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Provider unavailable
+                details: Both Serper and Tavily APIs failed
+        '504':
+          description: Request timeout (>10s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Timeout
+                details: Search exceeded 10 second threshold
+
+components:
+  schemas:
+    SearchResponse:
+      type: object
+      required:
+        - provider
+        - query
+        - cache_key
+        - results
+        - cached
+        - search_date
+      properties:
+        provider:
+          type: string
+          enum: [serper, tavily]
+          description: Provider used for this search
+        query:
+          type: string
+          description: Original search query
+        cache_key:
+          type: string
+          description: Composite cache key (city+topic+month)
+          example: skye_mcleod_2025-06
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+          maxItems: 50
+        cached:
+          type: boolean
+          description: Whether result was served from cache
+        cache_age_seconds:
+          type: integer
+          description: Age of cached result (omitted if cached=false)
+        search_date:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of search
+
+    SearchResult:
+      type: object
+      required:
+        - title
+        - url
+      properties:
+        title:
+          type: string
+          description: Page title
+        url:
+          type: string
+          format: uri
+          description: Page URL
+        snippet:
+          type: string
+          description: Text snippet or summary (Serper.dev)
+        position:
+          type: integer
+          description: Result position (Serper.dev)
+        relevance_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: AI relevance score (Tavily)
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error context

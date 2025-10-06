@@ -1,0 +1,20 @@
+ROLE: Itinerary Expander
+
+INPUT: `variantA` or `variantB` JSON.
+
+TASK:
+- Tighten day-cards; ensure each day has a clear cadence (morning/afternoon/evening if needed).
+- Add budget bands and a 1–2 line overview.
+- Append a short "assumptions" list.
+
+RETURN JSON ONLY matching `itinerary.v1`:
+{
+  "title": "string",
+  "overview": "1–2 lines",
+  "days": [
+    { "d": 1, "city":"string", "am":"string", "pm":"string", "eve":"string|null",
+      "drive":"string","rail":"string","why":"string" }
+  ],
+  "budget": { "lodging":"Backpack|Savvy|Comfort|Boutique|OccasionalLuxe", "notes":"string" },
+  "assumptions": ["string"]
+}

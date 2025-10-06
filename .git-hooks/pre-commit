@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pre-commit hook to check file sizes
+
+MAX_LINES=500
+OVERSIZE_FILES=()
+
+# Check staged files
+for file in $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|js|tsx|jsx)$'); do
+  if [ -f "$file" ]; then
+    lines=$(wc -l < "$file")
+    if [ "$lines" -gt "$MAX_LINES" ]; then
+      OVERSIZE_FILES+=("$file ($lines lines)")
+    fi
+  fi
+done
+
+# Report oversize files
+if [ ${#OVERSIZE_FILES[@]} -gt 0 ]; then
+  echo "⚠️  WARNING: The following files exceed $MAX_LINES lines:"
+  printf '   - %s\n' "${OVERSIZE_FILES[@]}"
+  echo ""
+  echo "Consider refactoring before committing. See REFACTORING.md for guidance."
+  echo ""
+  read -p "Continue anyway? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+exit 0

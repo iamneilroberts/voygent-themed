@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://voygent.com/schemas/hotel-listing.v1.json",
+  "title": "Hotel Listing",
+  "description": "Hotel search result with pricing and availability metadata (2-3 hotels per city)",
+  "type": "object",
+  "required": [
+    "hotel_id",
+    "name",
+    "nightly_price_low",
+    "nightly_price_high",
+    "budget_tier",
+    "availability_disclaimer"
+  ],
+  "properties": {
+    "hotel_id": {
+      "type": "string",
+      "description": "Provider's hotel identifier (Amadeus ID, Google Place ID, etc.)",
+      "examples": ["AMEDIN123", "ChIJa1b2c3d4h0gRz"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Hotel name",
+      "minLength": 1,
+      "examples": ["Heritage Inn Edinburgh", "Royal Mile Suites"]
+    },
+    "city": {
+      "type": "string",
+      "description": "Location city",
+      "examples": ["Edinburgh", "Isle of Skye", "Dublin"]
+    },
+    "nightly_price_low": {
+      "type": "number",
+      "description": "Minimum nightly rate in USD",
+      "minimum": 0,
+      "examples": [120, 100, 80]
+    },
+    "nightly_price_high": {
+      "type": "number",
+      "description": "Maximum nightly rate in USD",
+      "minimum": 0,
+      "examples": [180, 150, 120]
+    },
+    "star_rating": {
+      "type": "number",
+      "description": "Star rating (1-5, optional)",
+      "minimum": 1,
+      "maximum": 5,
+      "examples": [4, 4.5, 3.5]
+    },
+    "budget_tier": {
+      "type": "string",
+      "description": "Budget tier classification (must match intake luxury preference)",
+      "enum": ["budget", "comfort", "premium", "luxury"]
+    },
+    "provider": {
+      "type": "string",
+      "description": "Source provider",
+      "enum": ["amadeus", "serper", "google_places"]
+    },
+    "booking_reference": {
+      "type": "string",
+      "format": "uri",
+      "description": "External booking link (optional)",
+      "examples": ["https://www.google.com/travel/hotels/..."]
+    },
+    "availability_disclaimer": {
+      "type": "string",
+      "description": "Availability disclaimer (required per constitution)",
+      "default": "availability not guaranteed",
+      "const": "availability not guaranteed"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "nightly_price_low must be less than nightly_price_high",
+      "if": {
+        "properties": {
+          "nightly_price_low": { "type": "number" },
+          "nightly_price_high": { "type": "number" }
+        }
+      },
+      "then": {
+        "properties": {
+          "nightly_price_low": { "maximum": { "$data": "1/nightly_price_high" } }
+        }
+      }
+    }
+  ]
+}

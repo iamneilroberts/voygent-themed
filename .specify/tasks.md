@@ -1,0 +1,23 @@
+# Tasks
+
+- [ ] Boot project & DB
+  - [ ] Create D1/PG schema; run migrations.
+  - [ ] Set secrets for providers.
+- [ ] API endpoints
+  - [ ] POST /api/trips (intake → options[<=4])
+  - [ ] PATCH /api/trips/:id/select (choose option)
+  - [ ] PATCH /api/trips/:id/ab (A/B variants by prefs)
+  - [ ] GET /api/trips/:id; GET /api/trips?userId=…
+  - [ ] PATCH /api/trips/:id (update title/intake)
+- [ ] Provider router (cheap/smart)
+- [ ] Intake pipeline
+  - [ ] Multipart/file URL support; basic OCR for images (library or API).
+  - [ ] Normalize to `intake.v1.json` via prompt.
+- [ ] Prompt pack (see /prompts)
+- [ ] Frontend
+  - [ ] Chat UI + Quick Tuner (surnames, places, month, days, budget, transport, activity, accessibility).
+  - [ ] Upload UI (file/url/paste).
+  - [ ] Show options grid, then selection, then A/B.
+- [ ] Validation + “Why this pick”
+- [ ] Share copy & Pro handoff payload (JSON + human readme)
+- [ ] Smoke tests (happy path + empty fields)

@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: Voygent Provider API - Flights
+  description: Flight offers search with Amadeus primary, Kiwi Tequila fallback
+  version: 1.0.0
+  contact:
+    name: Voygent Heritage MVP
+
+servers:
+  - url: https://voygent-heritage-mvp.pages.dev/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /providers/flights:
+    get:
+      summary: Search flight offers
+      description: |
+        Returns low and median airfare estimates for a given route and month.
+        Uses Amadeus Flight Offers Search as primary provider, falls back to Kiwi Tequila API.
+        Results cached for 24 hours in D1.
+      operationId: searchFlights
+      tags:
+        - Providers
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Origin airport IATA code (3 letters)
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            example: JFK
+        - name: to
+          in: query
+          required: true
+          description: Destination airport IATA code (3 letters)
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+            example: EDI
+        - name: month
+          in: query
+          required: true
+          description: Travel month in YYYY-MM format
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+            example: 2025-06
+        - name: adults
+          in: query
+          required: false
+          description: Number of adult passengers (default 2)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+            default: 2
+        - name: route_type
+          in: query
+          required: false
+          description: Route type (default round_trip)
+          schema:
+            type: string
+            enum: [round_trip, one_way]
+            default: round_trip
+      responses:
+        '200':
+          description: Flight offers found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightOffersResponse'
+              examples:
+                amadeus_success:
+                  summary: Successful Amadeus response
+                  value:
+                    provider: amadeus
+                    route: JFK-EDI round-trip
+                    offers:
+                      - price_low: 850
+                        price_median: 1100
+                        price_high: 1350
+                        carrier: Delta
+                        route_type: round_trip
+                        estimate_date: '2025-10-05T12:00:00Z'
+                    cached: false
+                kiwi_fallback:
+                  summary: Kiwi Tequila fallback response
+                  value:
+                    provider: kiwi
+                    route: JFK-EDI round-trip
+                    offers:
+                      - price_low: 820
+                        price_median: 1050
+                        carrier: Multiple carriers
+                        route_type: round_trip
+                        estimate_date: '2025-10-05T12:05:00Z'
+                    cached: false
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Invalid IATA code
+                details: 'from' parameter must be a 3-letter airport code
+        '500':
+          description: Provider API failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Provider unavailable
+                details: Both Amadeus and Kiwi APIs failed
+        '504':
+          description: Request timeout (>10s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Timeout
+                details: Flight search exceeded 10 second threshold
+
+components:
+  schemas:
+    FlightOffersResponse:
+      type: object
+      required:
+        - provider
+        - route
+        - offers
+        - cached
+      properties:
+        provider:
+          type: string
+          enum: [amadeus, kiwi]
+          description: Provider used for this search
+        route:
+          type: string
+          description: Route in format "XXX-YYY round-trip"
+          example: JFK-EDI round-trip
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlightOffer'
+          minItems: 1
+        cached:
+          type: boolean
+          description: Whether result was served from cache
+        cache_age_seconds:
+          type: integer
+          description: Age of cached result (omitted if cached=false)
+
+    FlightOffer:
+      type: object
+      required:
+        - price_low
+        - price_median
+        - route_type
+        - estimate_date
+      properties:
+        price_low:
+          type: number
+          format: float
+          description: Low fare estimate in USD
+          example: 850
+        price_median:
+          type: number
+          format: float
+          description: Median fare estimate in USD
+          example: 1100
+        price_high:
+          type: number
+          format: float
+          description: High fare estimate in USD (optional)
+          example: 1350
+        carrier:
+          type: string
+          description: Airline name or "Multiple carriers"
+          example: Delta
+        route_type:
+          type: string
+          enum: [round_trip, one_way, multi_city]
+        estimate_date:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of estimate
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error context
