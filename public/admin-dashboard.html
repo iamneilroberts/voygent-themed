@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Voygent</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7fafc; }
+    .hidden { display: none !important; }
+
+    /* Login Screen */
+    .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 400px; }
+    .login-card h1 { text-align: center; color: #667eea; margin-bottom: 30px; }
+    .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #e5e7eb; border-radius: 8px; }
+    .login-card button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .error { color: #dc2626; padding: 10px; background: #fee; border-radius: 6px; margin-top: 10px; }
+
+    /* Dashboard */
+    .dashboard-header { background: white; padding: 20px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .dashboard-header h1 { color: #667eea; }
+    .header-actions button { margin-left: 15px; padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; }
+
+    /* Metrics */
+    .metrics-section { padding: 30px; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .metric-card { background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .metric-label { font-size: 0.9rem; color: #718096; margin-bottom: 8px; }
+    .metric-value { font-size: 2rem; font-weight: 700; color: #2d3748; }
+    .metric-warning { color: #f59e0b; }
+    .metric-critical { color: #dc2626; }
+
+    /* Errors Table */
+    .errors-section { padding: 0 30px 30px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
+    th { background: #f7fafc; padding: 12px; text-align: left; font-weight: 600; color: #4a5568; }
+    td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+    .severity-critical { color: #dc2626; font-weight: 600; }
+    .severity-error { color: #ea580c; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h1>Voygent Admin</h1>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <input type="email" id="emailInput" placeholder="Email" required>
+        <input type="password" id="passwordInput" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+      <div id="loginError" class="error hidden"></div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboardScreen" class="hidden">
+    <header class="dashboard-header">
+      <h1>Voygent Admin Dashboard</h1>
+      <div class="header-actions">
+        <span id="userInfo"></span>
+        <button onclick="refreshDashboard()">Refresh</button>
+        <button onclick="handleLogout()">Logout</button>
+      </div>
+    </header>
+
+    <section class="metrics-section">
+      <h2>Live Metrics (Last 5 Minutes)</h2>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Requests/Min</div>
+          <div class="metric-value" id="rpmValue">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Error Rate</div>
+          <div class="metric-value" id="errorRateValue">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Avg Response</div>
+          <div class="metric-value" id="avgResponseValue">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Active Requests</div>
+          <div class="metric-value" id="activeRequestsValue">--</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="errors-section">
+      <h2>Recent Errors</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Severity</th>
+            <th>Operation</th>
+            <th>Message</th>
+            <th>Trip ID</th>
+          </tr>
+        </thead>
+        <tbody id="errorsTableBody">
+          <tr><td colspan="5">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    let authToken = null;
+    let currentUser = null;
+
+    // Check auth on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(c => c.trim().startsWith('admin_token='));
+      if (tokenCookie) {
+        authToken = tokenCookie.split('=')[1];
+        showDashboard();
+        loadDashboardData();
+        setInterval(loadDashboardData, 10000); // Auto-refresh every 10s
+      }
+    });
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('emailInput').value;
+      const password = document.getElementById('passwordInput').value;
+      const errorDiv = document.getElementById('loginError');
+
+      try {
+        const response = await fetch('/api/admin/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Login failed');
+        }
+
+        const data = await response.json();
+        authToken = data.token;
+        currentUser = data.user;
+        showDashboard();
+        loadDashboardData();
+        setInterval(loadDashboardData, 10000);
+      } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.classList.remove('hidden');
+      }
+    }
+
+    function handleLogout() {
+      authToken = null;
+      currentUser = null;
+      document.cookie = 'admin_token=; Max-Age=0; Path=/';
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('dashboardScreen').classList.add('hidden');
+    }
+
+    function showDashboard() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('dashboardScreen').classList.remove('hidden');
+      if (currentUser) {
+        document.getElementById('userInfo').textContent = `${currentUser.email} (${currentUser.role})`;
+      }
+    }
+
+    async function loadDashboardData() {
+      await Promise.all([loadLiveMetrics(), loadRecentErrors()]);
+    }
+
+    async function refreshDashboard() {
+      console.log('Refreshing dashboard...');
+      await loadDashboardData();
+    }
+
+    async function loadLiveMetrics() {
+      try {
+        const response = await fetch('/api/admin/metrics?period=5m', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            handleLogout();
+            return;
+          }
+          throw new Error('Failed to load metrics');
+        }
+
+        const data = await response.json();
+
+        document.getElementById('rpmValue').textContent = data.rpm || '0';
+
+        const errorRate = ((data.error_rate || 0) * 100).toFixed(2);
+        const errorRateEl = document.getElementById('errorRateValue');
+        errorRateEl.textContent = `${errorRate}%`;
+        errorRateEl.className = 'metric-value';
+        if (data.error_rate > 0.05) errorRateEl.classList.add('metric-warning');
+        if (data.error_rate > 0.10) errorRateEl.classList.add('metric-critical');
+
+        document.getElementById('avgResponseValue').textContent = `${data.avg_response_ms || 0}ms`;
+        document.getElementById('activeRequestsValue').textContent = data.active_requests || '0';
+      } catch (error) {
+        console.error('Failed to load live metrics:', error);
+      }
+    }
+
+    async function loadRecentErrors() {
+      try {
+        const response = await fetch('/api/admin/logs?severity=ERROR&limit=20', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) throw new Error('Failed to load errors');
+
+        const data = await response.json();
+        const tbody = document.getElementById('errorsTableBody');
+
+        if (data.logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5">No recent errors</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.logs.map(log => {
+          const time = new Date(log.timestamp).toLocaleString();
+          const severity = log.severity === 'CRITICAL' ?
+            '<span class="severity-critical">CRITICAL</span>' :
+            '<span class="severity-error">ERROR</span>';
+
+          return `
+            <tr>
+              <td>${time}</td>
+              <td>${severity}</td>
+              <td>${log.operation}</td>
+              <td>${log.message}</td>
+              <td>${log.correlation_id || '--'}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Failed to load recent errors:', error);
+      }
+    }
+  </script>
+</body>
+</html>
