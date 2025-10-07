@@ -41,19 +41,19 @@ window.buildTextInput = buildTextInput;
 export function buildTextInput() {
   const selectedTheme = getSelectedTheme();
   const quickSearchInput = document.getElementById('quickSearch')?.value.trim() || '';
-  const surnames = document.getElementById('surnames').value.trim();
-  const origins = document.getElementById('origins').value.trim();
-  const adults = parseInt(document.getElementById('adults').value) || 2;
-  const children = document.getElementById('children').value.trim();
-  const duration = document.getElementById('duration').value.trim();
-  const month = document.getElementById('month').value;
-  const luxury = document.getElementById('luxury').value;
-  const activity = document.getElementById('activity').value;
-  const travelPace = document.getElementById('travel_pace').value;
-  const airport = document.getElementById('airport').value.trim();
-  const transportPref = document.getElementById('transport_pref').value;
-  const hotelType = document.getElementById('hotel_type').value;
-  const notes = document.getElementById('notes').value.trim();
+  const surnames = document.getElementById('surnames')?.value.trim() || '';
+  const origins = document.getElementById('origins')?.value.trim() || '';
+  const adults = parseInt(document.getElementById('adults')?.value) || 2;
+  const children = document.getElementById('children')?.value.trim() || '';
+  const duration = document.getElementById('duration')?.value.trim() || '';
+  const month = document.getElementById('month')?.value || '';
+  const luxury = document.getElementById('luxury')?.value || '';
+  const activity = document.getElementById('activity')?.value || '';
+  const travelPace = document.getElementById('travel_pace')?.value || '';
+  const airport = document.getElementById('airport')?.value.trim() || '';
+  const transportPref = document.getElementById('transport_pref')?.value || '';
+  const hotelType = document.getElementById('hotel_type')?.value || '';
+  const notes = document.getElementById('notes')?.value.trim() || '';
 
   let text = '';
 
