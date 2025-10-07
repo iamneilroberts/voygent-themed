@@ -4,13 +4,14 @@ import { getSelectedTheme, VALIDATION_MESSAGES } from './theme.js';
 import { selectedFiles } from './files.js';
 import { showError, hideError, showSuccess, hideSuccess, addProgressLog, showProgressStep, collapseCustomizeSections } from './ui.js';
 import { buildTextInput, displayResearchSummary } from './trips.js';
+import { showProgress, hideProgress } from './progress.js';
 
 export async function doResearchOnly() {
   const selectedTheme = getSelectedTheme();
-  const quickStartInput = document.getElementById('quickStartInput')?.value.trim() || '';
+  const quickSearchInput = document.getElementById('quickSearch')?.value.trim() || '';
   const surnames = document.getElementById('surnames').value.trim();
 
-  if (!surnames && !quickStartInput) {
+  if (!surnames && !quickSearchInput) {
     showError(VALIDATION_MESSAGES[selectedTheme] || 'Please enter trip details');
     return;
   }
@@ -28,9 +29,13 @@ export async function doResearchOnly() {
     formData.append('files', file);
   });
 
-  // Show loading
-  document.getElementById('loading').classList.remove('hidden');
-  document.getElementById('quickStartBtn').disabled = true;
+  // Show new progress overlay
+  showProgress(selectedTheme);
+
+  // Show loading (old style for backwards compatibility)
+  document.getElementById('loading')?.classList.remove('hidden');
+  const quickStartBtn = document.getElementById('quickStartBtn');
+  if (quickStartBtn) quickStartBtn.disabled = true;
   hideError();
   hideSuccess();
 
@@ -95,6 +100,12 @@ export async function doResearchOnly() {
 
     addProgressLog(`Research completed in ${(duration / 1000).toFixed(1)}s`, 'success');
 
+    // Store trip ID if available
+    if (data.id) {
+      window.currentTripId = data.id;
+      console.log('[Research] Trip ID stored:', data.id);
+    }
+
     // Display research results
     if (data.research && data.research.length > 0) {
       const researchStep = data.research.find(step =>
@@ -112,23 +123,35 @@ export async function doResearchOnly() {
     }
 
     // Hide loading spinner
-    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('loading')?.classList.add('hidden');
 
-    // Enable the Generate Trip Options button
+    // Hide progress overlay
+    hideProgress();
+
+    // Show the Generate Trip Options button
     const generateBtn = document.getElementById('generateBtn');
-    generateBtn.disabled = false;
-    generateBtn.style.display = 'block';
-    generateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (generateBtn) {
+      generateBtn.disabled = false;
+      generateBtn.style.display = 'block';
+      generateBtn.textContent = '✨ Generate Trip Options';
+      generateBtn.onclick = () => window.generateFullTrip();
+      generateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     // Show success message
-    showSuccess('✓ Research complete! Review the findings above, then click "Generate Trip Options" to continue.');
+    showSuccess('✓ Research complete! Review the findings above, then click "Generate Trip Options" to see itineraries and costs.');
 
-    addProgressLog('Ready to generate trip options', 'success');
+    addProgressLog('Ready to generate full trip', 'success');
 
   } catch (error) {
     console.error('[Research] Error:', error);
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('quickStartBtn').disabled = false;
+    document.getElementById('loading')?.classList.add('hidden');
+    const quickStartBtn = document.getElementById('quickStartBtn');
+    if (quickStartBtn) quickStartBtn.disabled = false;
+
+    // Hide progress overlay on error
+    hideProgress();
+
     showError(error.message || 'Research failed');
     addProgressLog(`Error: ${error.message}`, 'error');
   }

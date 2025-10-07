@@ -238,13 +238,51 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     console.log('[STEP 1.5] Starting theme-specific research...');
     const researchSteps = [];
 
-    // Heritage theme: surname research
+    // Heritage theme: surname + origin-based travel research
     if (intakeJson.theme === 'heritage' && intakeJson.surnames && intakeJson.surnames.length > 0) {
       const surname = intakeJson.surnames[0];
+      const origins = intakeJson.suspected_origins || [];
+      const interests = intakeJson.interests || [];
+      const notes = intakeJson.notes || [];
+      const sources = intakeJson.sources || [];
+
       console.log(`[STEP 1.5] Heritage research for surname: ${surname}`);
 
       try {
-        const searchQuery = `${surname} surname origin history genealogy`;
+        // Build search query from available context
+        let searchQuery = `${surname} family`;
+
+        // Add suspected origins if provided (most important for targeting destinations)
+        if (origins.length > 0) {
+          searchQuery += ` ${origins.slice(0, 3).join(' ')}`;
+        }
+
+        // Add relevant keywords from sources (genealogy notes, etc.)
+        if (sources.length > 0) {
+          const sourceNotes = sources
+            .filter((s: any) => s.notes)
+            .map((s: any) => s.notes)
+            .join(' ')
+            .substring(0, 80);
+          if (sourceNotes) {
+            searchQuery += ` ${sourceNotes}`;
+          }
+        }
+
+        // Add interests if provided
+        if (interests.length > 0) {
+          searchQuery += ` ${interests.slice(0, 2).join(' ')}`;
+        }
+
+        // Add relevant keywords from notes
+        if (notes.length > 0) {
+          const notesText = notes.join(' ').substring(0, 80);
+          searchQuery += ` ${notesText}`;
+        }
+
+        // Add travel-focused keywords
+        searchQuery += ' heritage sites ancestral homes castles historical tours travel destinations';
+
         console.log(`[STEP 1.5] Web search query: "${searchQuery}"`);
 
         const searchResult = env.SERPER_API_KEY
