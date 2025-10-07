@@ -80,6 +80,16 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 heritage trip options focusing on ancestral homelands, surname origins, and family history sites. Include cathedrals, cemeteries, archives, and regional museums.',
+    researchSynthesisPrompt: `You are a genealogy and heritage travel expert. Analyze the provided research about this surname and synthesize key insights for trip planning.
+
+Focus on:
+1. Geographic origins and migration patterns
+2. Historical sites, castles, and ancestral homes
+3. Regional cultural heritage and traditions
+4. Relevant museums, archives, and genealogy resources
+
+Provide a concise summary (2-3 paragraphs) highlighting the most relevant travel destinations and experiences.`,
+    researchQueryTemplate: '{surname} family heritage sites ancestral homes castles historical tours travel destinations',
     requiredFields: ['surnames', 'party'],
     optionalFields: ['suspected_origins', 'immigration_window', 'target_month', 'departure_airport', 'sources', 'duration_days'],
     exampleInputs: [
@@ -130,6 +140,16 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 TV/movie location trip options. Focus on authentic filming locations, behind-the-scenes experiences, and photo opportunities. Include practical tips for visiting each site.',
+    researchSynthesisPrompt: `You are a film location travel expert. Analyze the provided research about filming locations for this TV show or movie and synthesize key insights for trip planning.
+
+Focus on:
+1. Actual filming locations and their accessibility
+2. Behind-the-scenes tours and experiences available
+3. Best times to visit and avoid crowds
+4. Related attractions and secondary locations
+
+Provide a concise summary (2-3 paragraphs) highlighting the most iconic and visitable filming locations.`,
+    researchQueryTemplate: '{title} filming locations tour guide visitor information',
     requiredFields: ['titles', 'party', 'duration_days'],
     optionalFields: ['specific_scenes', 'fan_level', 'visited_locations', 'target_month'],
     exampleInputs: [
@@ -179,6 +199,16 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 historical event trip options. Focus on key sites, museums, memorials, and educational experiences. Include expert guides where available. Provide historical context for each location.',
+    researchSynthesisPrompt: `You are a historical travel expert. Analyze the provided research about this historical event or period and synthesize key insights for trip planning.
+
+Focus on:
+1. Key historical sites, battlefields, and monuments
+2. Museums and interpretive centers with relevant exhibits
+3. Expert-led tours and educational programs
+4. Primary and secondary locations of significance
+
+Provide a concise summary (2-3 paragraphs) highlighting the most historically significant and accessible sites.`,
+    researchQueryTemplate: '{event} historical sites museums tours visitor information',
     requiredFields: ['events', 'party', 'duration_days'],
     optionalFields: ['time_periods', 'educational_depth', 'target_month'],
     exampleInputs: [
@@ -232,6 +262,16 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 culinary trip options. Focus on authentic local experiences, cooking classes, market tours, wine regions, and Michelin-starred restaurants. Include practical dining tips and reservations guidance.',
+    researchSynthesisPrompt: `You are a culinary travel expert. Analyze the provided research about this cuisine or food region and synthesize key insights for trip planning.
+
+Focus on:
+1. Signature dishes and regional specialties
+2. Top restaurants, markets, and food halls
+3. Cooking schools and hands-on food experiences
+4. Wine regions, breweries, and beverage experiences
+
+Provide a concise summary (2-3 paragraphs) highlighting the most authentic and memorable culinary experiences.`,
+    researchQueryTemplate: '{cuisine} {region} restaurants cooking classes food tours markets',
     requiredFields: ['cuisines', 'party', 'duration_days'],
     optionalFields: ['regions', 'dietary_restrictions', 'cooking_classes', 'wine_tours'],
     exampleInputs: [
@@ -282,6 +322,16 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 outdoor adventure trip options. Mix guided and self-guided days, highlight safety considerations, and include realistic pacing for the declared fitness level.',
+    researchSynthesisPrompt: `You are an adventure travel expert. Analyze the provided research about this destination or activity and synthesize key insights for trip planning.
+
+Focus on:
+1. Best trails, routes, and adventure activities available
+2. Difficulty levels and required fitness/experience
+3. Best seasons and weather considerations
+4. Guided services, permits, and safety requirements
+
+Provide a concise summary (2-3 paragraphs) highlighting the most rewarding and accessible adventure experiences.`,
+    researchQueryTemplate: '{destination} {activity} hiking trails tours permits best time visit',
     requiredFields: ['activities', 'party', 'duration_days'],
     optionalFields: ['destinations', 'fitness_level', 'lodging_style', 'target_month'],
     exampleInputs: [
