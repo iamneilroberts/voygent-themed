@@ -213,7 +213,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
       });
     }
 
-    if (!validateIntake(intakeJson)) {
+    if (!validateIntake(intakeJson, template)) {
       return new Response(JSON.stringify({ error: 'Invalid intake schema', errors: validateIntake.errors }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }

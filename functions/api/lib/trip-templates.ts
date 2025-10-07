@@ -80,8 +80,8 @@ OUTPUT JSON ONLY:
   "assumptions": string[]
 }`,
     optionsPrompt: 'Generate 2-4 heritage trip options focusing on ancestral homelands, surname origins, and family history sites. Include cathedrals, cemeteries, archives, and regional museums.',
-    requiredFields: ['surnames', 'suspected_origins', 'party', 'duration_days'],
-    optionalFields: ['immigration_window', 'target_month', 'departure_airport', 'sources'],
+    requiredFields: ['surnames', 'party'],
+    optionalFields: ['suspected_origins', 'immigration_window', 'target_month', 'departure_airport', 'sources', 'duration_days'],
     exampleInputs: [
       'McLeod family from Isle of Skye, Scotland - 2 adults, 7 days in June',
       'https://www.ancestry.com/family-tree/person/tree/123456789/person/987654321',

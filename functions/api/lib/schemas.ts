@@ -1,32 +1,50 @@
 // JSON Schema validation - Manual validation for Cloudflare Workers compatibility
 // Note: Ajv uses eval() which is not allowed in Workers environment
 
-export function validateIntake(data: any): boolean {
+import type { TripTemplate } from './trip-templates';
+
+/**
+ * Template-driven intake validation
+ * Checks required fields based on the template's requiredFields array
+ */
+export function validateIntake(data: any, template?: TripTemplate): boolean {
   if (!data || typeof data !== 'object') return false;
   if (!data.theme || typeof data.theme !== 'string') return false;
 
-  // Theme-specific required fields
-  if (data.theme === 'heritage') {
-    if (!Array.isArray(data.surnames) || data.surnames.length === 0) return false;
-  } else if (data.theme === 'tvmovie') {
-    if (!Array.isArray(data.titles) || data.titles.length === 0) return false;
-  } else if (data.theme === 'historical') {
-    if (!Array.isArray(data.events) || data.events.length === 0) return false;
-  } else if (data.theme === 'culinary') {
-    if (!Array.isArray(data.cuisines) || data.cuisines.length === 0) return false;
-  } else if (data.theme === 'adventure') {
-    if (!Array.isArray(data.activities) || data.activities.length === 0) return false;
-  }
-
-  // Common required fields - apply defaults if missing
+  // Apply common defaults
   if (!data.party || typeof data.party !== 'object') {
     data.party = { adults: 2, children: [], accessibility: 'none' };
   }
   if (typeof data.party.adults !== 'number' || data.party.adults < 1) {
-    data.party.adults = 2; // Default to 2 adults
+    data.party.adults = 2;
   }
   if (!Array.isArray(data.party.children)) {
     data.party.children = [];
+  }
+
+  // If template provided, validate required fields
+  if (template && template.requiredFields) {
+    for (const field of template.requiredFields) {
+      const value = data[field];
+
+      // Check if field exists and has content
+      if (value === undefined || value === null) {
+        console.warn(`[Validation] Missing required field: ${field}`);
+        return false;
+      }
+
+      // For array fields, check if non-empty
+      if (Array.isArray(value) && value.length === 0) {
+        console.warn(`[Validation] Empty required array field: ${field}`);
+        return false;
+      }
+
+      // For string fields, check if non-empty
+      if (typeof value === 'string' && value.trim() === '') {
+        console.warn(`[Validation] Empty required string field: ${field}`);
+        return false;
+      }
+    }
   }
 
   return true;
