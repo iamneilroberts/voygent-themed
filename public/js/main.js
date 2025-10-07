@@ -75,7 +75,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const selectedTheme = document.getElementById('selectedTheme')?.value || 'heritage';
     formData.append('theme', selectedTheme);
 
-    const textInput = window.buildTextInput ? buildTextInput() : '';
+    const textInput = buildTextInput();
     formData.append('text', textInput);
 
     // Add any uploaded files
@@ -109,9 +109,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Display research summary if present
       if (data.diagnostics && data.diagnostics.research && data.diagnostics.research.length > 0) {
-        if (window.displayResearchSummary) {
-          displayResearchSummary(data.diagnostics.research);
-        }
+        console.log('[Generate Full Trip] Displaying research:', data.diagnostics.research);
+        displayResearchSummary(data.diagnostics.research);
       }
 
       // Display trip options
