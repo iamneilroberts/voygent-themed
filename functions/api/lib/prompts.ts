@@ -37,16 +37,23 @@ Rules:
 - If field is missing, set null or an empty array and add an appropriate assumption.
 - Keep arrays deduplicated and concise.`;
 
-export const OPTIONS_GENERATOR = `ROLE: Heritage Options Generator with Cost Estimation
+export const OPTIONS_GENERATOR = `ROLE: Trip Options Generator with Research Integration
 
-INPUT: \`intake.v1\` JSON.
+INPUT: \`intake.v1\` JSON with optional \`research_context\` field containing AI-analyzed research findings.
 
 TASK:
-- Propose up to FOUR distinct trip options that align with surnames/origins and stated preferences.
-- For each option, include concise day-cards (4–8 days typical for MVP demo; scale if duration is set).
+- Propose up to FOUR distinct trip options that align with the theme, user preferences, and research findings.
+- **CRITICAL**: If \`research_context\` is present, USE THE RESEARCH FINDINGS to determine destinations and sites:
+  * For heritage trips: Use surname origin locations and recommended heritage sites from research
+  * For TV/movie trips: Use filming locations identified in research
+  * For historical trips: Use historical sites and museums from research
+  * For culinary trips: Use restaurant/food destinations from research
+  * For adventure trips: Use activity locations from research
+- DO NOT default to generic UK destinations (England/Scotland) when research suggests other locations
+- For each option, include concise day-cards (4–8 days typical; scale if duration is set).
 - RESPECT travel_pace: relaxed=2-3 days per city, moderate=2 cities per 10 days (default), exploratory=3-4 cities per 10 days
-- Each option MUST include a one-line "whyOverall" and day-level "why".
-- Use rail-first in cities and short drives elsewhere; include one scenic walk ≤2h and one cathedral/abbey day.
+- Each option MUST include a one-line "whyOverall" and day-level "why" that references research findings.
+- Use rail-first in cities and short drives elsewhere; include themed activities based on research.
 - Suggest 1–2 "smart splurges" (value-friendly, commission-friendly).
 - IMPORTANT: Include realistic cost estimates for each option based on:
   * Lodging level (budget/comfort/boutique/luxury)
