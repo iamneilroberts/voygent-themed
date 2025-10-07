@@ -6,7 +6,7 @@ import { initLocationDetection } from './location.js';
 import { initFileUpload } from './files.js';
 import { doResearchOnly } from './research.js';
 import { setupCollapsibleSection, toggleDiagnostics } from './ui.js';
-import { resetPreviousResults } from './trips.js';
+import { resetPreviousResults, buildTextInput, displayResearchSummary } from './trips.js';
 import { loadBranding } from './branding.js';
 import { showProgress, hideProgress } from './progress.js';
 import { initCompactThemeSelector } from './compact-theme-selector.js';
