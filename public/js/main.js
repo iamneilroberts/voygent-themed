@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const generateBtn = document.getElementById('generateBtn');
   const quickSearchInput = document.getElementById('quickSearch');
 
-  // Expose generateTrip globally for onclick handler (initial research)
+  // Expose generateTrip globally for onclick handler (direct trip generation)
   window.generateTrip = () => {
     const quickSearch = quickSearchInput?.value.trim() || '';
     const surnames = document.getElementById('surnames')?.value.trim() || '';
@@ -63,8 +63,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Do research first, which will then enable "Generate Trip Options" button
-    doResearchOnly();
+    // Generate full trip directly (includes research + options)
+    window.generateFullTrip();
   };
 
   // Expose generateFullTrip for the second step (after research)
