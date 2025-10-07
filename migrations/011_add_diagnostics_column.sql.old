@@ -1,0 +1,2 @@
+-- Add diagnostics column to store research data as JSON
+ALTER TABLE themed_trips ADD COLUMN diagnostics TEXT DEFAULT NULL;

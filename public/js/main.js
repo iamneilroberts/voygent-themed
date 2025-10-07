@@ -85,6 +85,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     try {
+      // Start with animated progress initially
       showProgress(selectedTheme);
 
       const response = await fetch('/api/trips', {
@@ -98,6 +99,15 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
 
       const data = await response.json();
+
+      // If we got a trip ID, switch to real-time progress polling
+      // (This might arrive after the trip is complete, but good for future async processing)
+      if (data.tripId) {
+        console.log('[Generate Full Trip] Received trip ID:', data.tripId);
+        // For now, just hide progress since trip is complete
+        // In future with async processing, we would start polling here
+      }
+
       hideProgress();
 
       console.log('[Generate Full Trip] Success:', data);

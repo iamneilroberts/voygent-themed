@@ -44,8 +44,8 @@ GOOGLE_PLACES_API_KEY=your_google_places_api_key
 Run the cache providers migration:
 
 ```bash
-wrangler d1 execute voygent-prod --local --file=migrations/003_cache_providers.sql
-wrangler d1 execute voygent-prod --remote --file=migrations/003_cache_providers.sql
+wrangler d1 execute voygent-themed --local --file=migrations/003_cache_providers.sql
+wrangler d1 execute voygent-themed --remote --file=migrations/003_cache_providers.sql
 ```
 
 ### 3. Start Local Dev Server
@@ -510,7 +510,7 @@ curl -X GET "http://localhost:8788/api/providers/flights?from=JFK&to=EDI&month=2
 
 ```bash
 # Query cache_providers table
-wrangler d1 execute voygent-prod --local --command="SELECT provider, query_hash, created_at, ttl_seconds FROM cache_providers LIMIT 10"
+wrangler d1 execute voygent-themed --local --command="SELECT provider, query_hash, created_at, ttl_seconds FROM cache_providers LIMIT 10"
 ```
 
 **Expected**: Rows with provider="amadeus", query_hash=SHA256(...), ttl_seconds=86400
@@ -519,7 +519,7 @@ wrangler d1 execute voygent-prod --local --command="SELECT provider, query_hash,
 
 ```bash
 # Manually expire cache entry (for testing)
-wrangler d1 execute voygent-prod --local --command="UPDATE cache_providers SET created_at = unixepoch() - 90000 WHERE provider = 'amadeus'"
+wrangler d1 execute voygent-themed --local --command="UPDATE cache_providers SET created_at = unixepoch() - 90000 WHERE provider = 'amadeus'"
 
 # Re-request (should refresh)
 curl -X GET "http://localhost:8788/api/providers/flights?from=JFK&to=EDI&month=2025-06"

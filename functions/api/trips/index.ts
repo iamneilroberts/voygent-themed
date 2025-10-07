@@ -9,6 +9,7 @@ import { parseGenealogyURL, extractGenealogyContext, mergeGenealogyContexts, typ
 import * as serper from '../lib/serper';
 import * as tavily from '../lib/tavily';
 import { selectTemplate } from '../lib/trip-templates';
+import { updateProgress, PROGRESS_STEPS, getResearchMessage } from '../lib/progress';
 
 interface Env {
   DB: D1Database;
@@ -157,6 +158,13 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
       });
     }
 
+    // Step 0: Create trip early so we can track progress
+    const tripId = await createTrip(env.DB, userId);
+    console.log(`[STEP 0] Created trip ${tripId}`);
+
+    // Set initial progress
+    await updateProgress(env.DB, tripId, PROGRESS_STEPS.intake);
+
     // Step 0.5: Select trip template based on input or explicit theme
     const template = await selectTemplate(combinedInput, explicitTheme, env.DB);
     console.log(`[STEP 0.5] Selected template: ${template.name} (${template.id})`);
@@ -236,6 +244,11 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
 
     // Step 1.5: Theme-specific research
     console.log('[STEP 1.5] Starting theme-specific research...');
+    await updateProgress(env.DB, tripId, {
+      step: 'research',
+      message: getResearchMessage(intakeJson.theme),
+      percent: 40
+    });
     const researchSteps = [];
 
     // Heritage theme: surname + origin-based travel research
@@ -499,6 +512,8 @@ Keep your response concise and factual.`;
 
     // Step 2: Generate options (<=4) with CHEAP model, increased token limit
     console.log('[STEP 2] Generating trip options...');
+    await updateProgress(env.DB, tripId, PROGRESS_STEPS.options);
+
     // First attempt: 4 options with 1800 tokens
     const optionsProvider = selectProvider(JSON.stringify(intakeJson).length / 4, env, 'cheap');
     console.log(`[STEP 2] Provider: ${optionsProvider.name} (${optionsProvider.model})`);
@@ -597,13 +612,17 @@ Keep your response concise and factual.`;
         tripTitle = `${template.name} trip`;
     }
 
-    const tripId = await createTrip(env.DB, userId);
+    // Update trip with final data
     await updateTrip(env.DB, tripId, {
       intake_json: JSON.stringify(intakeJson),
       options_json: JSON.stringify(optionsJson),
       status: 'options_ready',
       title: tripTitle
     });
+
+    // Mark complete
+    await updateProgress(env.DB, tripId, PROGRESS_STEPS.complete);
+
     console.log(`[STEP 3] ✓ Trip saved. ID: ${tripId}`);
 
     // Save messages

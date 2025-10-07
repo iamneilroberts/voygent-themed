@@ -7,11 +7,16 @@
     "deploy": "wrangler pages deploy",
     "db:init": "wrangler d1 create voygent-heritage-db",
     "db:migrate": "wrangler d1 execute voygent-heritage-db --local --file=./migrations/001_init.sql",
-    "db:migrate:prod": "wrangler d1 execute voygent-heritage-db --remote --file=./migrations/001_init.sql"
+    "db:migrate:prod": "wrangler d1 execute voygent-heritage-db --remote --file=./migrations/001_init.sql",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.9.10",
+    "vitest": "^3.2.4",
     "wrangler": "^3.28.0"
   }
 }

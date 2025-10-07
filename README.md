@@ -40,20 +40,20 @@ Cloudflare Pages + Functions + D1 application for generating personalized herita
 npm install
 ```
 
-### 2. Create D1 database
+### 2. Database Configuration
 
-```bash
-wrangler d1 create voygent-heritage-db
-```
-
-Copy the database ID from the output and update `wrangler.toml`:
+The production database for voygent.app is:
 
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "voygent-heritage-db"
-database_id = "YOUR_DATABASE_ID_HERE"
+database_name = "voygent-themed"
+database_id = "62077781-9458-4206-a5c6-f38dc419e599"
 ```
+
+This is already configured in `wrangler.toml`.
+
+**📖 Full Schema Documentation**: See [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md) for complete table structures, relationships, indexes, and example queries.
 
 ### 3. Run migrations
 

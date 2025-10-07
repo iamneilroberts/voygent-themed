@@ -1,0 +1,21 @@
+{
+  "Williams family heritage sites Scotland": [
+    {
+      "title": "Williams Clan Heritage Sites in Scotland",
+      "url": "https://example.com/williams-heritage",
+      "snippet": "Explore the ancestral homeland of the Williams clan in the Scottish Highlands, including Edinburgh Castle, Culloden Battlefield, and various clan centers."
+    },
+    {
+      "title": "Scottish Heritage Travel: Williams Ancestry",
+      "url": "https://example.com/scottish-heritage",
+      "snippet": "Discover your Williams family roots with guided tours of historic sites in Edinburgh, Inverness, and the Highlands."
+    }
+  ],
+  "default": [
+    {
+      "title": "Default Heritage Site",
+      "url": "https://example.com/default",
+      "snippet": "Default heritage site information for testing."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "williams_scotland": {
+    "text": "I want to explore my Williams family heritage in Scotland",
+    "theme": "heritage",
+    "expected": {
+      "surnames": ["Williams"],
+      "suspected_origins": ["Scotland"],
+      "theme": "heritage"
+    }
+  },
+  "mcleod_detailed": {
+    "text": "McLeod family trip to Scotland, interested in castles and historical sites, 10 days, comfort budget",
+    "theme": "heritage",
+    "expected": {
+      "surnames": ["McLeod"],
+      "suspected_origins": ["Scotland"],
+      "interests": ["castles", "historical sites"],
+      "duration_days": 10,
+      "budget_tier": "comfort",
+      "theme": "heritage"
+    }
+  }
+}

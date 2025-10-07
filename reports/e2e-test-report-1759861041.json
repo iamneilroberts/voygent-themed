@@ -1,0 +1,35 @@
+{
+  "runId": "e2e-run-1759860972",
+  "timestamp": 1759861041,
+  "environment": {
+    "targetUrl": "https://voygent.app",
+    "testerHost": "homelab",
+    "gitCommit": "563c76a"
+  },
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "skipped": 0,
+    "duration": 717,
+    "totalCost": 0
+  },
+  "performance": {
+    "avgResponseTime": 358.50,
+    "totalDuration": 717
+  },
+  "costs": {
+    "totalCost": 0,
+    "avgCostPerTrip": 0
+  },
+  "cleanup": {
+    "cleanupSuccess": true,
+    "remainingRecords": 0,
+    "testUserIds": [
+  "e2e-test-1759860973-heritage"
+],
+    "testTripIds": [
+  ""
+]
+  }
+}

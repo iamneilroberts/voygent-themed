@@ -1,0 +1,5 @@
+{
+  "heritage_intake": "{\"surnames\": [\"Williams\"], \"suspected_origins\": [\"Scotland\"], \"duration_days\": 7, \"budget_tier\": \"comfort\", \"theme\": \"heritage\"}",
+  "heritage_options": "{\"options\": [{\"title\": \"Scottish Heritage Trail\", \"cities\": [\"Edinburgh\", \"Inverness\", \"Isle of Skye\"], \"itinerary\": [{\"day\": 1, \"location\": \"Edinburgh\", \"activities\": [\"Edinburgh Castle\", \"Royal Mile\"]}], \"estimated_budget\": 3500, \"highlights\": [\"Visit Edinburgh Castle\", \"Explore Highland castles\", \"Isle of Skye landscapes\"]}, {\"title\": \"Lowlands Heritage Journey\", \"cities\": [\"Edinburgh\", \"Glasgow\", \"Stirling\"], \"itinerary\": [{\"day\": 1, \"location\": \"Edinburgh\", \"activities\": [\"National Museum\"]}], \"estimated_budget\": 2800, \"highlights\": [\"Stirling Castle\", \"Glasgow heritage sites\"]}]}",
+  "default": "{\"error\": \"No mock response configured for this prompt\"}"
+}

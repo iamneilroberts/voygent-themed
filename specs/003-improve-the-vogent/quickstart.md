@@ -229,7 +229,7 @@ setTimeout(() => showToast('success', 'Test 4'), 1500);
 **Database Verification**:
 ```bash
 # Check D1 database
-wrangler d1 execute voygent-prod --local --command="SELECT * FROM themes ORDER BY created_at DESC LIMIT 5;"
+wrangler d1 execute voygent-themed --local --command="SELECT * FROM themes ORDER BY created_at DESC LIMIT 5;"
 ```
 
 ---

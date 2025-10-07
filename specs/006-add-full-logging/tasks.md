@@ -51,7 +51,7 @@ Documentation (T038)
 1. Verify server is running: `wrangler pages dev --local --port 8788 public`
 2. Check for compilation errors in console
 3. Verify database migrations applied: `npx wrangler d1 list`
-4. Check that voygent-prod database exists
+4. Check that voygent-themed database exists
 5. Open browser to `http://localhost:8788` and verify page loads
 
 **Acceptance Criteria**:
@@ -113,10 +113,10 @@ Documentation (T038)
 - Execute: `migrations/011_add_logging_tables.sql`
 
 **Steps**:
-1. Run migration: `npx wrangler d1 execute voygent-prod --local --file=migrations/011_add_logging_tables.sql`
-2. Verify tables created: `npx wrangler d1 execute voygent-prod --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%log%' OR name='admin_users'"`
-3. Verify indexes: `npx wrangler d1 execute voygent-prod --local --command="SELECT name FROM sqlite_master WHERE type='index'"`
-4. Check table schemas: `npx wrangler d1 execute voygent-prod --local --command="PRAGMA table_info(logs)"`
+1. Run migration: `npx wrangler d1 execute voygent-themed --local --file=migrations/011_add_logging_tables.sql`
+2. Verify tables created: `npx wrangler d1 execute voygent-themed --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%log%' OR name='admin_users'"`
+3. Verify indexes: `npx wrangler d1 execute voygent-themed --local --command="SELECT name FROM sqlite_master WHERE type='index'"`
+4. Check table schemas: `npx wrangler d1 execute voygent-themed --local --command="PRAGMA table_info(logs)"`
 5. Document any errors and resolve
 
 **Acceptance Criteria**:
@@ -128,7 +128,7 @@ Documentation (T038)
 
 **Test Command**:
 ```bash
-npx wrangler d1 execute voygent-prod --local --command="SELECT COUNT(*) FROM logs"
+npx wrangler d1 execute voygent-themed --local --command="SELECT COUNT(*) FROM logs"
 # Should return 0 (empty table, but no error)
 ```
 
@@ -166,8 +166,8 @@ npx wrangler d1 execute voygent-prod --local --command="SELECT COUNT(*) FROM log
      NULL
    );
    ```
-4. Run seed: `npx wrangler d1 execute voygent-prod --local --file=migrations/012_seed_admin_user.sql`
-5. Verify: `npx wrangler d1 execute voygent-prod --local --command="SELECT email, role FROM admin_users"`
+4. Run seed: `npx wrangler d1 execute voygent-themed --local --file=migrations/012_seed_admin_user.sql`
+5. Verify: `npx wrangler d1 execute voygent-themed --local --command="SELECT email, role FROM admin_users"`
 
 **Acceptance Criteria**:
 - [ ] Seed migration created
@@ -704,7 +704,7 @@ npx wrangler d1 execute voygent-prod --local --command="SELECT COUNT(*) FROM log
 **Test Command**:
 ```bash
 # After making a request
-npx wrangler d1 execute voygent-prod --local --command="SELECT * FROM logs ORDER BY timestamp DESC LIMIT 5"
+npx wrangler d1 execute voygent-themed --local --command="SELECT * FROM logs ORDER BY timestamp DESC LIMIT 5"
 ```
 
 ---

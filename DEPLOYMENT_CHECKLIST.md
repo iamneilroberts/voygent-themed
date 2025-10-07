@@ -69,10 +69,10 @@ echo "your_value" | wrangler secret put AMADEUS_CLIENT_ID
 
 ```bash
 # Check local database
-wrangler d1 execute voygent-prod --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"
+wrangler d1 execute voygent-themed --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"
 
 # Check remote database
-wrangler d1 execute voygent-prod --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"
+wrangler d1 execute voygent-themed --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"
 ```
 
 Expected output: `{"name":"cache_providers"}`
@@ -206,7 +206,7 @@ curl "https://voygent-heritage-mvp.pages.dev/api/handoff/your-trip-id-here"
 ### 1. Check Cache Table
 
 ```bash
-wrangler d1 execute voygent-prod --remote --command="SELECT COUNT(*) as count FROM cache_providers"
+wrangler d1 execute voygent-themed --remote --command="SELECT COUNT(*) as count FROM cache_providers"
 ```
 
 After running tests, should show cached entries.
@@ -214,7 +214,7 @@ After running tests, should show cached entries.
 ### 2. Check Trip Records
 
 ```bash
-wrangler d1 execute voygent-prod --remote --command="SELECT id, title, status FROM heritage_trips ORDER BY created_at DESC LIMIT 5"
+wrangler d1 execute voygent-themed --remote --command="SELECT id, title, status FROM heritage_trips ORDER BY created_at DESC LIMIT 5"
 ```
 
 Should show recently created trips with genealogy data.
@@ -246,7 +246,7 @@ Watch for errors or warnings during live traffic.
 
 ### Error: "No such table: cache_providers"
 - Migration not run on remote database
-- Run: `wrangler d1 execute voygent-prod --remote --file=migrations/003_cache_providers.sql`
+- Run: `wrangler d1 execute voygent-themed --remote --file=migrations/003_cache_providers.sql`
 
 ### Error: "FamilySearch URL parsing failed"
 - FamilySearch API may be down

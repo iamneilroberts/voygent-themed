@@ -20,7 +20,7 @@
 ### Configuration
 - ✅ `.dev.vars` created from ~/Documents/.env
 - ✅ `wrangler.toml` configured with account ID and D1 database
-- ✅ Database: `voygent-prod` (ID: b0eb7ec7-67bc-4b54-b66b-02f4efc22a24)
+- ✅ Database: `voygent-themed` (ID: 62077781-9458-4206-a5c6-f38dc419e599)
 
 ### Database
 - ✅ Heritage tables created (`heritage_trips`, `heritage_messages`)
@@ -114,7 +114,7 @@ curl -X PATCH https://voygent-heritage-mvp.pages.dev/api/trips/{TRIP_ID}/ab \
 
 ## 🗄️ Database
 
-**Database**: `voygent-prod`
+**Database**: `voygent-themed` (ID: 62077781-9458-4206-a5c6-f38dc419e599)
 **Tables**:
 - `heritage_trips` - Main trip records
 - `heritage_messages` - Message/cost tracking
@@ -219,7 +219,7 @@ wrangler pages deployment tail --project-name=voygent-heritage-mvp
 
 ### Check Database
 ```bash
-wrangler d1 execute voygent-prod --remote \
+wrangler d1 execute voygent-themed --remote \
   --command="SELECT COUNT(*) FROM heritage_trips;"
 ```
 

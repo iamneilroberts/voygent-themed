@@ -32,9 +32,9 @@
 - [ ] Add INDEX idx_cache_lookup on (provider, query_hash, created_at)
 
 ### T002: Run Database Migration
-- [ ] Execute migration locally: `wrangler d1 execute voygent-prod --local --file=migrations/003_cache_providers.sql`
-- [ ] Execute migration remotely: `wrangler d1 execute voygent-prod --remote --file=migrations/003_cache_providers.sql`
-- [ ] Verify table exists: `wrangler d1 execute voygent-prod --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"`
+- [ ] Execute migration locally: `wrangler d1 execute voygent-themed --local --file=migrations/003_cache_providers.sql`
+- [ ] Execute migration remotely: `wrangler d1 execute voygent-themed --remote --file=migrations/003_cache_providers.sql`
+- [ ] Verify table exists: `wrangler d1 execute voygent-themed --local --command="SELECT name FROM sqlite_master WHERE type='table' AND name='cache_providers'"`
 
 ### T003 [P]: Create JSON Schemas
 - [ ] Create `schemas/cost-estimate.v1.json` per Cost Estimate entity

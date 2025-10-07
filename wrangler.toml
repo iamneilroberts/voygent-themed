@@ -7,6 +7,11 @@ binding = "DB"
 database_name = "voygent-themed"
 database_id = "62077781-9458-4206-a5c6-f38dc419e599"
 
+[[d1_databases]]
+binding = "TEST_DB"
+database_name = "voygent-test"
+database_id = "7d0f2214-43a5-4e89-b504-569eda801786"
+
 [ai]
 binding = "AI"
 
