@@ -17,7 +17,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadBranding();
 
   // Initialize compact theme selector (new UI)
-  initCompactThemeSelector();
+  initCompactThemeSelector().catch(err => {
+    console.error('[Main] Failed to initialize compact theme selector:', err);
+  });
 
   // Initialize location detection
   initLocationDetection();

@@ -15,9 +15,12 @@ export async function initCompactThemeSelector() {
 
   try {
     // Fetch templates from API
+    console.log('[Compact Theme Selector] Fetching templates...');
     const templates = await fetchTemplates();
+    console.log('[Compact Theme Selector] Received templates:', templates.length);
 
-    if (templates.length === 0) {
+    if (!templates || templates.length === 0) {
+      console.error('[Compact Theme Selector] No templates available');
       showError('No templates available');
       return;
     }
@@ -29,22 +32,30 @@ export async function initCompactThemeSelector() {
     console.log(`[Compact Theme Selector] Loaded ${featured.length} featured, ${secondary.length} secondary templates`);
 
     // Render both sections
+    console.log('[Compact Theme Selector] Rendering featured templates...');
     renderFeaturedTemplates(featured);
+
+    console.log('[Compact Theme Selector] Rendering secondary templates...');
     renderSecondaryTemplates(secondary);
 
     // Hide loading, show content
-    document.getElementById('themeLoading').style.display = 'none';
-    document.getElementById('primaryThemesContainer').style.display = 'flex';
+    console.log('[Compact Theme Selector] Showing UI...');
+    const loadingEl = document.getElementById('themeLoading');
+    const primaryEl = document.getElementById('primaryThemesContainer');
+    const secondaryEl = document.getElementById('secondaryThemesContainer');
 
-    if (secondary.length > 0) {
-      document.getElementById('secondaryThemesContainer').style.display = 'block';
-    }
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (primaryEl) primaryEl.style.display = 'flex';
+    if (secondaryEl && secondary.length > 0) secondaryEl.style.display = 'block';
 
     // Set up search functionality
     setupThemeSearch();
 
+    console.log('[Compact Theme Selector] Initialization complete!');
+
   } catch (error) {
     console.error('[Compact Theme Selector] Failed to load templates:', error);
+    console.error('[Compact Theme Selector] Error stack:', error.stack);
     showError('Failed to load themes. Please refresh the page.');
   }
 }
