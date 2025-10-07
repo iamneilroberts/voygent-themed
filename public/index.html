@@ -955,28 +955,44 @@
     <!-- Compact Theme Selector -->
     <div class="quick-tuner" style="padding: 25px 20px;">
       <h2 style="font-size: 1.5rem; margin-bottom: 20px; text-align: center;">Choose Your Trip Theme</h2>
-      <div class="theme-selector-compact">
-        <button type="button" class="theme-btn active" data-theme="heritage">
-          <span class="icon">🌳</span>
-          <span class="label">Heritage</span>
-        </button>
-        <button type="button" class="theme-btn" data-theme="tvmovie">
-          <span class="icon">🎬</span>
-          <span class="label">TV/Movie</span>
-        </button>
-        <button type="button" class="theme-btn" data-theme="historical">
-          <span class="icon">⚔️</span>
-          <span class="label">Historical</span>
-        </button>
-        <button type="button" class="theme-btn" data-theme="culinary">
-          <span class="icon">🍴</span>
-          <span class="label">Culinary</span>
-        </button>
-        <button type="button" class="theme-btn" data-theme="adventure">
-          <span class="icon">🏔️</span>
-          <span class="label">Adventure</span>
-        </button>
+      <div id="themeLoading" style="text-align: center; padding: 20px; color: #666;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #667eea; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <span style="margin-left: 10px;">Loading templates...</span>
       </div>
+
+      <!-- Primary/Featured Templates -->
+      <div id="primaryThemesContainer" class="theme-selector-compact" style="display: none;">
+        <!-- Featured theme buttons will be dynamically inserted here -->
+      </div>
+
+      <!-- Secondary Templates (Searchable) -->
+      <div id="secondaryThemesContainer" style="display: none; margin-top: 20px;">
+        <details style="background: #f8f9fa; border-radius: 8px; padding: 15px; border: 1px solid #e0e0e0;">
+          <summary style="cursor: pointer; font-weight: 600; color: #667eea; display: flex; align-items: center; gap: 8px;">
+            <span>✨</span>
+            <span>More Specialized Themes</span>
+            <span id="secondaryThemeCount" style="background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em;"></span>
+          </summary>
+
+          <div style="margin-top: 15px;">
+            <input
+              type="text"
+              id="themeSearchInput"
+              placeholder="🔍 Search for a theme (e.g., wellness, music, wine)..."
+              style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; margin-bottom: 15px;"
+            />
+
+            <div id="secondaryThemesList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto;">
+              <!-- Secondary theme buttons will be dynamically inserted here -->
+            </div>
+
+            <div id="noThemesFound" style="display: none; text-align: center; padding: 20px; color: #999;">
+              No themes match your search
+            </div>
+          </div>
+        </details>
+      </div>
+
       <input type="hidden" id="selectedTheme" value="heritage">
     </div>
 
