@@ -181,7 +181,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
       userPrompt: combinedInput,
       maxTokens: 1200,  // Increased for more complex themes
       temperature: 0.5
-    });
+    }, env);
 
     console.log(`[STEP 1] ✓ Intake normalized. Tokens: ${intakeResponse.tokensIn}→${intakeResponse.tokensOut}, Cost: $${intakeResponse.costUsd.toFixed(4)}`);
 
@@ -487,7 +487,7 @@ Keep your response concise and factual.`;
           userPrompt: reasoningPrompt,
           maxTokens: 300,
           temperature: 0.7
-        });
+        }, env);
 
         console.log(`[STEP 1.5] ✓ AI reasoning complete. Tokens: ${reasoningResponse.tokensOut}, Cost: $${reasoningResponse.costUsd.toFixed(4)}`);
 
@@ -536,7 +536,7 @@ Keep your response concise and factual.`;
         userPrompt: JSON.stringify(intakeJson, null, 2),
         maxTokens,
         temperature: 0.7
-      });
+      }, env);
 
       console.log(`[STEP 2] Response received. Tokens: ${optionsResponse.tokensIn}→${optionsResponse.tokensOut}, Cost: $${optionsResponse.costUsd.toFixed(4)}`);
 

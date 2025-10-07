@@ -62,13 +62,30 @@ export function selectProvider(
 
 export async function callProvider(
   config: ProviderConfig,
-  request: ProviderRequest
+  request: ProviderRequest,
+  env?: any
 ): Promise<ProviderResponse> {
   const { systemPrompt, userPrompt, maxTokens = 2000, temperature = 0.7 } = request;
   const tokensIn = estimateTokens(systemPrompt + userPrompt);
 
   if (config.provider === 'openai') {
-    return callOpenAI(config, systemPrompt, userPrompt, maxTokens, temperature, tokensIn);
+    try {
+      return await callOpenAI(config, systemPrompt, userPrompt, maxTokens, temperature, tokensIn);
+    } catch (error: any) {
+      console.error('[Provider] OpenAI failed, attempting Anthropic fallback:', error.message);
+
+      // Fallback to Anthropic if available
+      if (env?.ANTHROPIC_API_KEY) {
+        const fallbackConfig: ProviderConfig = {
+          provider: 'anthropic',
+          model: config.model === 'gpt-4o' ? 'claude-3-5-sonnet-20241022' : 'claude-3-haiku-20240307',
+          apiKey: env.ANTHROPIC_API_KEY
+        };
+        return await callAnthropic(fallbackConfig, systemPrompt, userPrompt, maxTokens, temperature, tokensIn);
+      }
+
+      throw error; // Re-throw if no fallback available
+    }
   } else {
     return callAnthropic(config, systemPrompt, userPrompt, maxTokens, temperature, tokensIn);
   }
