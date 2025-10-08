@@ -251,8 +251,11 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     });
     const researchSteps = [];
 
+    console.log(`[RESEARCH] Starting research phase. Theme: ${intakeJson.theme}, Surnames: ${JSON.stringify(intakeJson.surnames)}`);
+
     // Heritage theme: surname + origin-based travel research
     if (intakeJson.theme === 'heritage' && intakeJson.surnames && intakeJson.surnames.length > 0) {
+      console.log(`[RESEARCH] ✓ Heritage research condition met for surname: ${intakeJson.surnames[0]}`);
       const surname = intakeJson.surnames[0];
       const origins = intakeJson.suspected_origins || [];
       const interests = intakeJson.interests || [];
