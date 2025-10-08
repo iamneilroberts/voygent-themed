@@ -9,14 +9,38 @@ export interface TripTemplate {
   icon: string;
   intakePrompt: string;              // Custom intake normalizer prompt
   optionsPrompt: string;              // Custom options generator prompt
-  researchSynthesisPrompt?: string;   // Custom research synthesis prompt (NEW)
-  researchQueryTemplate?: string;     // Search query template (NEW)
+  researchSynthesisPrompt?: string;   // Custom research synthesis prompt
+  researchQueryTemplate?: string;     // Search query template
   requiredFields: string[];           // Fields that MUST be extracted
   optionalFields: string[];           // Fields that are nice to have
   exampleInputs: string[];            // Example user inputs for this theme
   tags?: string[];                    // Search/filter tags
   isFeatured?: boolean;               // Show in featured section
   displayOrder?: number;              // Order in featured section
+
+  // NEW: UI Verbiage (Migration 020)
+  searchPlaceholder?: string;         // Search box placeholder text
+  searchHelpText?: string;            // Help text for search
+  progressMessages?: string[];        // JSON array of progress messages
+
+  // NEW: Workflow Control (Migration 020)
+  workflowPrompt?: string;            // Master AI workflow orchestration prompt
+  dailyActivityPrompt?: string;       // Prompt for generating daily activities
+  whyWeSuggestPrompt?: string;        // Prompt for "why we suggest" explanations
+  numberOfOptions?: number;           // How many trip options to generate (1-10)
+  tripDaysMin?: number;               // Minimum trip duration
+  tripDaysMax?: number;               // Maximum trip duration
+
+  // NEW: Config Arrays (Migration 020)
+  luxuryLevels?: string[];            // Available luxury levels
+  activityLevels?: string[];          // Available activity levels
+  transportPreferences?: string[];    // Available transport options
+
+  // NEW: Provider Instructions (Migration 020)
+  tourSearchInstructions?: string;    // How to search for tours/excursions
+  hotelSearchInstructions?: string;   // Amadeus hotel search guidance
+  flightSearchInstructions?: string;  // Amadeus flight search guidance
+  estimateMarginPercent?: number;     // Margin % for agent commission (10-25)
 }
 
 interface TemplateRow {
@@ -35,6 +59,24 @@ interface TemplateRow {
   tags?: string;
   is_featured?: number;
   display_order?: number;
+
+  // NEW: Migration 020 columns
+  search_placeholder?: string;
+  search_help_text?: string;
+  progress_messages?: string;
+  workflow_prompt?: string;
+  daily_activity_prompt?: string;
+  why_we_suggest_prompt?: string;
+  number_of_options?: number;
+  trip_days_min?: number;
+  trip_days_max?: number;
+  luxury_levels?: string;
+  activity_levels?: string;
+  transport_preferences?: string;
+  tour_search_instructions?: string;
+  hotel_search_instructions?: string;
+  flight_search_instructions?: string;
+  estimate_margin_percent?: number;
 }
 
 function parseJsonArray(value: string | null, fallback: string[] = []): string[] {
@@ -62,7 +104,31 @@ function rowToTemplate(row: TemplateRow): TripTemplate {
     exampleInputs: parseJsonArray(row.example_inputs),
     tags: row.tags ? parseJsonArray(row.tags) : undefined,
     isFeatured: row.is_featured === 1,
-    displayOrder: row.display_order
+    displayOrder: row.display_order,
+
+    // NEW: UI Verbiage
+    searchPlaceholder: row.search_placeholder || undefined,
+    searchHelpText: row.search_help_text || undefined,
+    progressMessages: row.progress_messages ? parseJsonArray(row.progress_messages) : undefined,
+
+    // NEW: Workflow Control
+    workflowPrompt: row.workflow_prompt || undefined,
+    dailyActivityPrompt: row.daily_activity_prompt || undefined,
+    whyWeSuggestPrompt: row.why_we_suggest_prompt || undefined,
+    numberOfOptions: row.number_of_options || 4,
+    tripDaysMin: row.trip_days_min || 3,
+    tripDaysMax: row.trip_days_max || 14,
+
+    // NEW: Config Arrays
+    luxuryLevels: row.luxury_levels ? parseJsonArray(row.luxury_levels, ['budget', 'comfort', 'premium', 'luxury']) : undefined,
+    activityLevels: row.activity_levels ? parseJsonArray(row.activity_levels, ['relaxed', 'moderate', 'active', 'intense']) : undefined,
+    transportPreferences: row.transport_preferences ? parseJsonArray(row.transport_preferences, ['flights', 'trains', 'car', 'mixed']) : undefined,
+
+    // NEW: Provider Instructions
+    tourSearchInstructions: row.tour_search_instructions || undefined,
+    hotelSearchInstructions: row.hotel_search_instructions || undefined,
+    flightSearchInstructions: row.flight_search_instructions || undefined,
+    estimateMarginPercent: row.estimate_margin_percent || 17
   };
 }
 

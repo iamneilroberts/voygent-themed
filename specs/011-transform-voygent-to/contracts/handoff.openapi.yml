@@ -1,0 +1,503 @@
+openapi: 3.1.0
+info:
+  title: Travel Agent Handoff API
+  description: |
+    API for generating comprehensive handoff documents for travel agent quotes.
+    Includes complete chat history, research summary, all options shown, and
+    selected preferences. Supports PDF and JSON export.
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+tags:
+  - name: Handoff
+    description: Handoff document generation
+  - name: Quotes
+    description: Travel agent quote management
+
+paths:
+  /trips/{id}/handoff:
+    post:
+      summary: Generate handoff document
+      tags: [Handoff]
+      description: |
+        Creates comprehensive handoff document for travel agent.
+        Captures complete trip context including ALL options shown to user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - selected_flight_id
+                - selected_hotel_ids
+                - daily_itinerary
+              properties:
+                selected_flight_id:
+                  type: string
+                  description: ID from flight estimates
+                selected_hotel_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Hotel IDs for each location
+                selected_transport_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Transport option IDs
+                daily_itinerary:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DailyPlan'
+                special_requests:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Handoff document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffDocument'
+        '400':
+          description: Invalid selections
+        '404':
+          description: Trip not found
+
+    get:
+      summary: Get handoff document
+      tags: [Handoff]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Handoff document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffDocument'
+        '404':
+          description: Handoff document not found
+
+  /trips/{id}/handoff/pdf:
+    get:
+      summary: Download handoff as PDF
+      tags: [Handoff]
+      description: |
+        Returns professionally formatted PDF for travel agent.
+        PDF includes all trip details, options, and user preferences.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF document
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Handoff document not found
+        '202':
+          description: PDF generation in progress, retry in 5s
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [generating]
+                  retry_after_seconds:
+                    type: integer
+
+  /trips/{id}/handoff/json:
+    get:
+      summary: Export handoff as JSON
+      tags: [Handoff]
+      description: |
+        Returns complete structured data for programmatic access.
+        Useful for travel agency systems integration.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffExport'
+        '404':
+          description: Handoff document not found
+
+  /handoffs:
+    get:
+      summary: List handoffs for agent
+      tags: [Quotes]
+      description: Travel agent endpoint to view assigned handoffs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, quoted, booked, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of handoffs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  handoffs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HandoffSummary'
+                  total:
+                    type: integer
+
+  /handoffs/{handoff_id}/quote:
+    post:
+      summary: Submit agent quote
+      tags: [Quotes]
+      description: |
+        Travel agent submits their quote back to the system.
+        Quote is routed to original user via email/notification.
+      parameters:
+        - name: handoff_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quote_usd
+              properties:
+                quote_usd:
+                  type: number
+                  format: float
+                  description: Final quoted price
+                agent_notes:
+                  type: string
+                  description: Internal notes or modifications
+                modifications:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      item:
+                        type: string
+                      original_price:
+                        type: number
+                      new_price:
+                        type: number
+                      reason:
+                        type: string
+      responses:
+        '200':
+          description: Quote submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  quote_id:
+                    type: string
+                  user_notified:
+                    type: boolean
+        '400':
+          description: Invalid quote
+        '403':
+          description: Not authorized for this handoff
+        '404':
+          description: Handoff not found
+
+  /handoffs/{handoff_id}/accept:
+    post:
+      summary: User accepts agent quote
+      tags: [Quotes]
+      description: User accepts travel agent's quote, status → booked
+      parameters:
+        - name: handoff_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quote accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [booked]
+                  agent_contact:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      phone:
+                        type: string
+
+components:
+  schemas:
+    HandoffDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        trip_id:
+          type: string
+        user_id:
+          type: string
+
+        # Complete Context
+        chat_history:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+          description: Last 100 messages
+
+        research_summary:
+          type: string
+          description: Full AI research synthesis
+
+        user_preferences:
+          type: object
+          properties:
+            luxury_level:
+              type: string
+            activity_level:
+              type: string
+            transport:
+              type: string
+            days:
+              type: integer
+            adults:
+              type: integer
+            children:
+              type: integer
+            budget_usd:
+              type: number
+            special_requests:
+              type: string
+
+        # All Options Shown
+        all_flight_options:
+          type: array
+          items:
+            type: object
+          description: Every flight option shown to user
+        selected_flight_id:
+          type: string
+
+        all_hotel_options:
+          type: array
+          items:
+            type: object
+          description: Every hotel option shown to user
+        selected_hotel_ids:
+          type: array
+          items:
+            type: string
+
+        all_transport_options:
+          type: array
+          items:
+            type: object
+          nullable: true
+        selected_transport_ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+        # Final Itinerary
+        daily_itinerary:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyPlan'
+
+        total_estimate_usd:
+          type: number
+          format: float
+        margin_percent:
+          type: integer
+
+        # Agent Interaction
+        agent_id:
+          type: string
+          nullable: true
+        agent_quote_usd:
+          type: number
+          nullable: true
+        agent_notes:
+          type: string
+          nullable: true
+        quote_status:
+          type: string
+          enum: [pending, quoted, booked, cancelled]
+
+        # Export
+        pdf_url:
+          type: string
+          format: uri
+          nullable: true
+
+        # Metadata
+        created_at:
+          type: string
+          format: date-time
+        quoted_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+
+    DailyPlan:
+      type: object
+      properties:
+        day:
+          type: integer
+        date:
+          type: string
+          format: date
+        location:
+          type: string
+        activities:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                description: HH:MM format
+              activity:
+                type: string
+              type:
+                type: string
+                enum: [paid_tour, free, meal, transport]
+              cost_usd:
+                type: number
+        why_we_suggest:
+          type: string
+          description: AI-generated explanation tied to trip theme
+        meals:
+          type: object
+          properties:
+            breakfast:
+              type: string
+            lunch:
+              type: string
+            dinner:
+              type: string
+        accommodation:
+          type: string
+        daily_total_usd:
+          type: number
+
+    HandoffSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        trip_id:
+          type: string
+        user_name:
+          type: string
+        destination:
+          type: string
+        days:
+          type: integer
+        travelers:
+          type: integer
+        total_estimate_usd:
+          type: number
+        quote_status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    HandoffExport:
+      type: object
+      description: Complete structured export for agency systems
+      properties:
+        handoff:
+          $ref: '#/components/schemas/HandoffDocument'
+        trip_template:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+        system_metadata:
+          type: object
+          properties:
+            export_timestamp:
+              type: string
+              format: date-time
+            api_version:
+              type: string
+            provider_used:
+              type: string

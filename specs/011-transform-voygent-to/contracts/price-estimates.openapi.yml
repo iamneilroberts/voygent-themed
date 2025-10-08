@@ -1,0 +1,488 @@
+openapi: 3.1.0
+info:
+  title: Price Estimates API
+  description: |
+    Amadeus-powered price estimation API for flights, hotels, and transport.
+    All prices are ESTIMATES ONLY with configurable margin for agent commission.
+    No actual booking functionality.
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+tags:
+  - name: Flights
+    description: Flight price estimates
+  - name: Hotels
+    description: Hotel price estimates
+  - name: Transport
+    description: Ground transport estimates
+
+paths:
+  /trips/{id}/flights:
+    post:
+      summary: Get flight price estimates
+      tags: [Flights]
+      description: |
+        Returns 3-5 flight options: cheapest, shortest, and upgrades.
+        Uses template's flight_search_instructions for AI guidance.
+        Prices include template's estimate_margin_percent markup.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - from
+                - to
+                - departure_date
+                - adults
+              properties:
+                from:
+                  type: string
+                  description: IATA airport code or city
+                to:
+                  type: string
+                  description: IATA airport code or city
+                departure_date:
+                  type: string
+                  format: date
+                return_date:
+                  type: string
+                  format: date
+                  nullable: true
+                adults:
+                  type: integer
+                  minimum: 1
+                children:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                cabin_class:
+                  type: string
+                  enum: [economy, premium_economy, business, first]
+                  default: economy
+      responses:
+        '200':
+          description: Flight estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flights:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FlightEstimate'
+                  margin_percent:
+                    type: integer
+                    description: From template configuration
+                  disclaimer:
+                    type: string
+                    default: "Prices are estimates only. Final price from travel agent may vary."
+        '400':
+          description: Invalid search parameters
+        '404':
+          description: Trip not found
+
+  /trips/{id}/hotels:
+    post:
+      summary: Get hotel price estimates
+      tags: [Hotels]
+      description: |
+        Returns 3-7 hotel options per location matching luxury level.
+        Uses template's hotel_search_instructions for AI guidance.
+        Prices include template's estimate_margin_percent markup.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - location
+                - checkin
+                - nights
+                - adults
+              properties:
+                location:
+                  type: string
+                  description: City name or hotel area
+                checkin:
+                  type: string
+                  format: date
+                nights:
+                  type: integer
+                  minimum: 1
+                adults:
+                  type: integer
+                  minimum: 1
+                children:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                luxury_level:
+                  type: string
+                  description: From template's luxury_levels
+      responses:
+        '200':
+          description: Hotel estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hotels:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HotelEstimate'
+                  margin_percent:
+                    type: integer
+                  disclaimer:
+                    type: string
+                    default: "Prices are estimates only. Final price from travel agent may vary."
+        '400':
+          description: Invalid search parameters
+        '404':
+          description: Trip not found
+
+  /trips/{id}/transport:
+    post:
+      summary: Get transport price estimates
+      tags: [Transport]
+      description: |
+        Estimates rental car, rail, or hired driver costs.
+        Uses template's transport preferences and AI estimation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - from_location
+                - to_location
+                - date
+              properties:
+                type:
+                  type: string
+                  enum: [rental_car, train, hired_driver, bus, ferry]
+                from_location:
+                  type: string
+                to_location:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                days:
+                  type: integer
+                  minimum: 1
+                  description: For rental car duration
+                adults:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Transport estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  options:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransportEstimate'
+                  margin_percent:
+                    type: integer
+                  disclaimer:
+                    type: string
+        '400':
+          description: Invalid parameters
+        '404':
+          description: Trip not found
+
+  /trips/{id}/tours:
+    post:
+      summary: Get tour/excursion price estimates
+      tags: [Transport]
+      description: |
+        Searches TripAdvisor and Tours by Locals for activities.
+        Uses template's tour_search_instructions for AI guidance.
+        Filters by rating, group size, and luxury level.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - location
+                - date
+                - adults
+              properties:
+                location:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                adults:
+                  type: integer
+                  minimum: 1
+                children:
+                  type: integer
+                  minimum: 0
+                luxury_level:
+                  type: string
+                activity_level:
+                  type: string
+                search_query:
+                  type: string
+                  description: e.g., "whisky distillery tour"
+      responses:
+        '200':
+          description: Tour estimates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tours:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TourEstimate'
+                  margin_percent:
+                    type: integer
+                  disclaimer:
+                    type: string
+
+components:
+  schemas:
+    FlightEstimate:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+          enum: [cheapest, shortest, upgrade_comfort, upgrade_business, upgrade_first]
+        from:
+          type: object
+          properties:
+            airport_code:
+              type: string
+            city:
+              type: string
+            terminal:
+              type: string
+        to:
+          type: object
+          properties:
+            airport_code:
+              type: string
+            city:
+              type: string
+            terminal:
+              type: string
+        departure:
+          type: string
+          format: date-time
+        arrival:
+          type: string
+          format: date-time
+        carrier:
+          type: string
+          description: Airline name
+        flight_number:
+          type: string
+        cabin_class:
+          type: string
+          enum: [economy, premium_economy, business, first]
+        duration_hours:
+          type: number
+          format: float
+        stops:
+          type: integer
+          minimum: 0
+        base_price_usd:
+          type: number
+          format: float
+          description: Amadeus price without margin
+        estimated_price_usd:
+          type: number
+          format: float
+          description: With margin applied
+        margin_applied_usd:
+          type: number
+          format: float
+        baggage:
+          type: object
+          properties:
+            carry_on:
+              type: integer
+            checked:
+              type: integer
+
+    HotelEstimate:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Amadeus hotel ID
+        name:
+          type: string
+        star_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        address:
+          type: string
+        distance_from_center_km:
+          type: number
+          format: float
+        base_price_per_night_usd:
+          type: number
+          format: float
+        estimated_price_per_night_usd:
+          type: number
+          format: float
+          description: With margin applied
+        estimated_total_usd:
+          type: number
+          format: float
+          description: Per night × nights with margin
+        amenities:
+          type: array
+          items:
+            type: string
+          description: wifi, parking, breakfast, pool, gym, spa, etc.
+        rating:
+          type: number
+          format: float
+          description: Guest rating (e.g., 4.5/5)
+        review_count:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    TransportEstimate:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [rental_car, train, hired_driver, bus, ferry]
+        provider:
+          type: string
+          description: Company name
+        from_location:
+          type: string
+        to_location:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+          nullable: true
+        arrival_time:
+          type: string
+          format: date-time
+          nullable: true
+        duration_hours:
+          type: number
+          format: float
+        vehicle_type:
+          type: string
+          nullable: true
+          description: For rental car or hired driver
+        base_price_usd:
+          type: number
+          format: float
+        estimated_price_usd:
+          type: number
+          format: float
+        margin_applied_usd:
+          type: number
+          format: float
+        notes:
+          type: string
+          nullable: true
+
+    TourEstimate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+          description: TripAdvisor, Tours by Locals, etc.
+        duration_hours:
+          type: number
+          format: float
+        group_type:
+          type: string
+          enum: [private, small_group, large_group]
+        max_participants:
+          type: integer
+        rating:
+          type: number
+          format: float
+        review_count:
+          type: integer
+        highlights:
+          type: array
+          items:
+            type: string
+        includes:
+          type: array
+          items:
+            type: string
+          description: Meals, transport, entrance fees, etc.
+        base_price_usd:
+          type: number
+          format: float
+          description: Per person
+        estimated_price_usd:
+          type: number
+          format: float
+        margin_applied_usd:
+          type: number
+          format: float
+        booking_url:
+          type: string
+          format: uri
+          description: For travel agent reference only

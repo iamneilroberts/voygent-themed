@@ -1,0 +1,312 @@
+openapi: 3.1.0
+info:
+  title: Research Workflow API
+  description: |
+    Research-first workflow API ensuring AI research summary is displayed
+    before trip options are generated. Includes template-driven prompts.
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+tags:
+  - name: Research
+    description: Research workflow operations
+  - name: Trip Creation
+    description: Trip creation flow
+
+paths:
+  /trips:
+    post:
+      summary: Create new trip (with research-first workflow)
+      tags: [Trip Creation]
+      description: |
+        Creates trip and initiates research phase. Trip cannot proceed to
+        options generation until research summary is displayed to user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - template_id
+                - intake
+              properties:
+                template_id:
+                  type: string
+                  description: Template to use for this trip
+                intake:
+                  type: object
+                  description: User input matching template's required_fields
+                  additionalProperties: true
+      responses:
+        '201':
+          description: Trip created, research initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trip_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [researching]
+                  correlation_id:
+                    type: string
+                    description: Use for log polling
+        '400':
+          description: Invalid intake data
+
+  /trips/{id}/research:
+    get:
+      summary: Get research status and summary
+      tags: [Research]
+      description: |
+        Poll this endpoint to check research progress. When status is 'complete',
+        research_summary will be populated.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Research status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, in_progress, complete, failed]
+                  research_summary:
+                    type: string
+                    nullable: true
+                    description: Populated when status is 'complete'
+                  research_viewed:
+                    type: boolean
+                    description: Has user viewed the summary?
+                  error:
+                    type: string
+                    nullable: true
+                  provider_used:
+                    type: string
+                    description: AI provider (Z.AI, OpenAI, or Anthropic)
+                  tokens_used:
+                    type: integer
+                  cost_usd:
+                    type: number
+                    format: float
+        '404':
+          description: Trip not found
+
+    patch:
+      summary: Mark research summary as viewed
+      tags: [Research]
+      description: |
+        MUST be called after displaying research summary to user.
+        This gates the ability to generate trip options.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - research_viewed
+              properties:
+                research_viewed:
+                  type: boolean
+                  enum: [true]
+      responses:
+        '200':
+          description: Research marked as viewed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  can_generate_options:
+                    type: boolean
+                    description: Should be true after this call
+        '400':
+          description: Invalid request
+        '404':
+          description: Trip not found
+
+  /trips/{id}/options:
+    post:
+      summary: Generate trip options
+      tags: [Trip Creation]
+      description: |
+        Generates N trip options based on template configuration.
+        REQUIRES research_viewed = true, otherwise returns 403.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - preferences
+              properties:
+                preferences:
+                  type: object
+                  properties:
+                    days:
+                      type: integer
+                      minimum: 1
+                    luxury_level:
+                      type: string
+                      description: Must match template's luxury_levels
+                    activity_level:
+                      type: string
+                      description: Must match template's activity_levels
+                    transport_preference:
+                      type: string
+                      description: Must match template's transport_preferences
+                    budget_usd:
+                      type: number
+                      format: float
+                    adults:
+                      type: integer
+                      minimum: 1
+                    children:
+                      type: integer
+                      minimum: 0
+                    special_requests:
+                      type: string
+      responses:
+        '200':
+          description: Options generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [options_ready]
+                  options:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TripOption'
+                  number_of_options:
+                    type: integer
+                    description: From template.number_of_options
+        '403':
+          description: Research not viewed yet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Must view research summary before generating options"
+                  research_viewed:
+                    type: boolean
+                    enum: [false]
+        '404':
+          description: Trip not found
+
+  /trips/{id}/progress:
+    get:
+      summary: Get trip creation progress
+      tags: [Trip Creation]
+      description: |
+        Returns current progress with template-driven progress messages.
+        Used for UI loading states.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Progress status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [researching, research_ready, generating_options, options_ready, building_trip, complete]
+                  progress_message:
+                    type: string
+                    description: From template.progress_messages array
+                  percent_complete:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                  estimated_seconds_remaining:
+                    type: integer
+                    nullable: true
+
+components:
+  schemas:
+    TripOption:
+      type: object
+      properties:
+        option_id:
+          type: string
+        title:
+          type: string
+          description: AI-generated trip title
+        summary:
+          type: string
+          description: Brief overview (2-3 sentences)
+        days:
+          type: integer
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              city:
+                type: string
+              country:
+                type: string
+              nights:
+                type: integer
+        estimated_total_usd:
+          type: number
+          format: float
+          description: Rough estimate before flight/hotel selection
+        highlights:
+          type: array
+          items:
+            type: string
+          maxItems: 5
+        matches_preferences:
+          type: object
+          properties:
+            luxury_level:
+              type: string
+            activity_level:
+              type: string
+            transport:
+              type: string

@@ -1,0 +1,374 @@
+openapi: 3.1.0
+info:
+  title: Diagnostics & Logging API
+  description: |
+    Real-time diagnostic window API integrated with Feature 006 logging.
+    Provides trip-specific log streaming, provider metrics, and error tracking.
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+tags:
+  - name: Trip Diagnostics
+    description: Trip-specific logging and diagnostics
+  - name: System Diagnostics
+    description: System-wide metrics and health
+
+paths:
+  /trips/{id}/diagnostics:
+    get:
+      summary: Get trip diagnostics
+      tags: [Trip Diagnostics]
+      description: |
+        Returns all logs for this trip via correlation_id.
+        Frontend polls this endpoint every 2s for real-time updates.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only return logs after this timestamp
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+          description: Filter by log level
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category (request, provider, amadeus, etc.)
+      responses:
+        '200':
+          description: Trip logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  has_more:
+                    type: boolean
+                  last_timestamp:
+                    type: string
+                    format: date-time
+                  summary:
+                    $ref: '#/components/schemas/TripDiagnosticSummary'
+        '404':
+          description: Trip not found
+
+  /trips/{id}/diagnostics/stream:
+    get:
+      summary: Stream trip diagnostics (polling endpoint)
+      tags: [Trip Diagnostics]
+      description: |
+        Long-polling endpoint for real-time log updates.
+        Holds connection for up to 30s waiting for new logs.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: last_log_id
+          in: query
+          schema:
+            type: string
+          description: ID of last received log
+      responses:
+        '200':
+          description: New logs available
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  last_log_id:
+                    type: string
+        '204':
+          description: No new logs (timeout after 30s)
+        '404':
+          description: Trip not found
+
+  /trips/{id}/diagnostics/export:
+    get:
+      summary: Export trip logs as JSON
+      tags: [Trip Diagnostics]
+      description: Download complete log history for debugging
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log export
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trip_id:
+                    type: string
+                  correlation_id:
+                    type: string
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  export_timestamp:
+                    type: string
+                    format: date-time
+        '404':
+          description: Trip not found
+
+  /admin/diagnostics/health:
+    get:
+      summary: System health check
+      tags: [System Diagnostics]
+      description: Overall system health and key metrics
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, down]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [up, down]
+                      amadeus:
+                        type: string
+                        enum: [up, down]
+                      providers:
+                        type: object
+                        properties:
+                          zai:
+                            type: string
+                            enum: [up, down, unavailable]
+                          openai:
+                            type: string
+                            enum: [up, down, unavailable]
+                          anthropic:
+                            type: string
+                            enum: [up, down, unavailable]
+                  metrics:
+                    type: object
+                    properties:
+                      active_trips:
+                        type: integer
+                      error_rate_percent:
+                        type: number
+                      avg_response_time_ms:
+                        type: number
+
+  /admin/diagnostics/errors:
+    get:
+      summary: Recent errors across all trips
+      tags: [System Diagnostics]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: hours
+          in: query
+          schema:
+            type: integer
+            default: 24
+          description: Look back N hours
+      responses:
+        '200':
+          description: Error list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LogEntry'
+                  total:
+                    type: integer
+                  error_categories:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Count by category
+
+  /admin/diagnostics/providers:
+    get:
+      summary: Provider usage statistics
+      tags: [System Diagnostics]
+      description: AI provider usage, costs, and fallback metrics
+      parameters:
+        - name: hours
+          in: query
+          schema:
+            type: integer
+            default: 24
+      responses:
+        '200':
+          description: Provider stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period_hours:
+                    type: integer
+                  providers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderStats'
+                  total_cost_usd:
+                    type: number
+                  total_requests:
+                    type: integer
+                  fallback_count:
+                    type: integer
+                    description: Number of times fallback was used
+
+components:
+  schemas:
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        correlation_id:
+          type: string
+          description: Links to trip_id
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        category:
+          type: string
+          description: request, provider, amadeus, template, etc.
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+        request_id:
+          type: string
+          nullable: true
+        user_id:
+          type: string
+          nullable: true
+        sanitized:
+          type: boolean
+          description: Has PII been sanitized?
+
+    TripDiagnosticSummary:
+      type: object
+      properties:
+        trip_id:
+          type: string
+        correlation_id:
+          type: string
+        total_logs:
+          type: integer
+        log_levels:
+          type: object
+          properties:
+            debug:
+              type: integer
+            info:
+              type: integer
+            warn:
+              type: integer
+            error:
+              type: integer
+        categories:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count by category
+        providers_used:
+          type: array
+          items:
+            type: string
+          description: Z.AI, OpenAI, Anthropic
+        total_cost_usd:
+          type: number
+        total_tokens:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+          description: Error messages
+        duration_seconds:
+          type: number
+          description: Time from first to last log
+
+    ProviderStats:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [zai, openai, anthropic]
+        model:
+          type: string
+        requests:
+          type: integer
+        success_count:
+          type: integer
+        error_count:
+          type: integer
+        fallback_count:
+          type: integer
+          description: Times this provider fell back to another
+        total_tokens_in:
+          type: integer
+        total_tokens_out:
+          type: integer
+        total_cost_usd:
+          type: number
+        avg_latency_ms:
+          type: number
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+              count:
+                type: integer

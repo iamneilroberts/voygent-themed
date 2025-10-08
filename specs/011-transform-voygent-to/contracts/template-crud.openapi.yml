@@ -1,0 +1,538 @@
+openapi: 3.1.0
+info:
+  title: Trip Template CRUD API
+  description: |
+    Admin API for managing trip templates in the prompt-driven system.
+    Supports full CRUD operations with JSON schema validation.
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+tags:
+  - name: Templates
+    description: Template management operations
+  - name: Validation
+    description: Template validation utilities
+
+paths:
+  /admin/templates:
+    get:
+      summary: List all templates
+      tags: [Templates]
+      parameters:
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TripTemplate'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      summary: Create new template
+      tags: [Templates]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '201':
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripTemplate'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /admin/templates/{id}:
+    get:
+      summary: Get template by ID
+      tags: [Templates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripTemplate'
+        '404':
+          description: Template not found
+
+    put:
+      summary: Update template
+      tags: [Templates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripTemplate'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Template not found
+
+    delete:
+      summary: Deactivate template
+      tags: [Templates]
+      description: Sets is_active to false. Templates are never hard deleted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Template not found
+
+  /admin/templates/{id}/validate:
+    post:
+      summary: Validate template configuration
+      tags: [Validation]
+      description: |
+        Validates all prompts, JSON fields, and business logic without saving.
+        Useful for admin UI to show validation errors before submission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        message:
+                          type: string
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        message:
+                          type: string
+
+  /admin/templates/{id}/duplicate:
+    post:
+      summary: Duplicate template
+      tags: [Templates]
+      description: Creates a copy with "(Copy)" suffix in name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Template duplicated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripTemplate'
+        '404':
+          description: Source template not found
+
+components:
+  schemas:
+    TripTemplate:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - intake_prompt
+        - options_prompt
+        - required_fields
+      properties:
+        # Existing fields
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          minLength: 10
+          maxLength: 500
+        icon:
+          type: string
+          default: "✈️"
+        intake_prompt:
+          type: string
+          minLength: 50
+          maxLength: 5000
+        options_prompt:
+          type: string
+          minLength: 50
+          maxLength: 5000
+        required_fields:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 20
+        optional_fields:
+          type: array
+          items:
+            type: string
+          maxItems: 20
+          default: []
+        example_inputs:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+          default: []
+        research_synthesis_prompt:
+          type: string
+          nullable: true
+          minLength: 50
+          maxLength: 3000
+        research_query_template:
+          type: string
+          nullable: true
+          minLength: 20
+          maxLength: 500
+        is_active:
+          type: boolean
+          default: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+        # NEW: UI Verbiage
+        search_placeholder:
+          type: string
+          minLength: 10
+          maxLength: 100
+          default: "Enter your destination or theme..."
+        search_help_text:
+          type: string
+          minLength: 10
+          maxLength: 300
+          default: "Describe what kind of trip you're looking for"
+        progress_messages:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+          minItems: 1
+          maxItems: 10
+          nullable: true
+
+        # NEW: Workflow Control
+        workflow_prompt:
+          type: string
+          nullable: true
+          minLength: 100
+          maxLength: 10000
+          description: Master prompt controlling trip generation workflow
+        daily_activity_prompt:
+          type: string
+          nullable: true
+          minLength: 50
+          maxLength: 2000
+          description: Prompt for generating daily itinerary details
+        why_we_suggest_prompt:
+          type: string
+          nullable: true
+          minLength: 50
+          maxLength: 1000
+          description: Prompt for "why we suggest this" explanations
+        number_of_options:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 4
+        trip_days_min:
+          type: integer
+          minimum: 1
+          default: 3
+        trip_days_max:
+          type: integer
+          minimum: 1
+          default: 14
+
+        # NEW: Config Arrays
+        luxury_levels:
+          type: array
+          items:
+            type: string
+            maxLength: 20
+          minItems: 1
+          maxItems: 6
+          default: ["budget", "comfort", "premium", "luxury"]
+        activity_levels:
+          type: array
+          items:
+            type: string
+            maxLength: 20
+          minItems: 1
+          maxItems: 6
+          default: ["relaxed", "moderate", "active", "intense"]
+        transport_preferences:
+          type: array
+          items:
+            type: string
+            maxLength: 20
+          minItems: 1
+          maxItems: 10
+          default: ["flights", "trains", "car", "mixed"]
+
+        # NEW: Provider Instructions
+        tour_search_instructions:
+          type: string
+          nullable: true
+          minLength: 20
+          maxLength: 2000
+          description: How to search TripAdvisor/tours
+        hotel_search_instructions:
+          type: string
+          nullable: true
+          minLength: 20
+          maxLength: 2000
+          description: Amadeus hotel search criteria
+        flight_search_instructions:
+          type: string
+          nullable: true
+          minLength: 20
+          maxLength: 2000
+          description: Amadeus flight search criteria
+        estimate_margin_percent:
+          type: integer
+          minimum: 10
+          maximum: 25
+          default: 17
+          description: Percentage margin for agent commission
+
+    CreateTemplateRequest:
+      type: object
+      required:
+        - name
+        - description
+        - intake_prompt
+        - options_prompt
+        - required_fields
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        intake_prompt:
+          type: string
+        options_prompt:
+          type: string
+        required_fields:
+          type: array
+          items:
+            type: string
+        optional_fields:
+          type: array
+          items:
+            type: string
+        workflow_prompt:
+          type: string
+        daily_activity_prompt:
+          type: string
+        why_we_suggest_prompt:
+          type: string
+        number_of_options:
+          type: integer
+        trip_days_min:
+          type: integer
+        trip_days_max:
+          type: integer
+        luxury_levels:
+          type: array
+          items:
+            type: string
+        activity_levels:
+          type: array
+          items:
+            type: string
+        transport_preferences:
+          type: array
+          items:
+            type: string
+        tour_search_instructions:
+          type: string
+        hotel_search_instructions:
+          type: string
+        flight_search_instructions:
+          type: string
+        estimate_margin_percent:
+          type: integer
+
+    UpdateTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        intake_prompt:
+          type: string
+        options_prompt:
+          type: string
+        workflow_prompt:
+          type: string
+        daily_activity_prompt:
+          type: string
+        why_we_suggest_prompt:
+          type: string
+        search_placeholder:
+          type: string
+        search_help_text:
+          type: string
+        progress_messages:
+          type: array
+          items:
+            type: string
+        number_of_options:
+          type: integer
+        trip_days_min:
+          type: integer
+        trip_days_max:
+          type: integer
+        luxury_levels:
+          type: array
+          items:
+            type: string
+        activity_levels:
+          type: array
+          items:
+            type: string
+        transport_preferences:
+          type: array
+          items:
+            type: string
+        tour_search_instructions:
+          type: string
+        hotel_search_instructions:
+          type: string
+        flight_search_instructions:
+          type: string
+        estimate_margin_percent:
+          type: integer
+        is_active:
+          type: boolean
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+        field_errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
