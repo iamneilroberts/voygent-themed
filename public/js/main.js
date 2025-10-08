@@ -120,35 +120,35 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.currentTripId = tripId;
       }
 
-      // Feature 011: Research-first workflow
-      // Show research viewer, which gates access to trip options
+      // Feature 011: Show research summary (no acknowledgment required)
       const researchContainer = document.getElementById('researchSummary');
-      if (researchContainer) {
+      if (researchContainer && data.diagnostics && data.diagnostics.research) {
         researchContainer.classList.remove('hidden');
 
-        const viewer = new window.ResearchViewer(tripId, () => {
-          console.log('[Research] User acknowledged research, showing options');
+        // Display research summary from diagnostics
+        const researchHTML = `
+          <div class="research-container">
+            <div class="research-header">
+              <h2>📚 Research Summary</h2>
+              <p class="research-subtitle">
+                We've conducted research based on your interests.
+              </p>
+            </div>
+            <div class="research-content">
+              ${Array.isArray(data.diagnostics.research)
+                ? data.diagnostics.research.map(r => `<p>${r.summary || r}</p>`).join('')
+                : `<p>${data.diagnostics.research}</p>`
+              }
+            </div>
+          </div>
+        `;
 
-          // After research is acknowledged, display trip options
-          if (window.displayTripOptions) {
-            displayTripOptions(data);
-          }
-        });
+        researchContainer.innerHTML = researchHTML;
+      }
 
-        viewer.load().then(() => {
-          viewer.render(researchContainer);
-        }).catch(err => {
-          console.error('[Research] Failed to load research:', err);
-          // Fallback: show options anyway
-          if (window.displayTripOptions) {
-            displayTripOptions(data);
-          }
-        });
-      } else {
-        // Fallback: show options if no research container
-        if (window.displayTripOptions) {
-          displayTripOptions(data);
-        }
+      // Display trip options immediately
+      if (window.displayTripOptions) {
+        displayTripOptions(data);
       }
 
     } catch (error) {
