@@ -131,17 +131,7 @@
     }
     .option-card .days { font-size: 0.9rem; color: #777; }
 
-    .variants-section {
-      margin-top: 30px;
-    }
-    .variant-card {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-    }
-    .variant-card h3 { color: #764ba2; margin-bottom: 15px; }
+    /* REMOVED: variant-card styles - no longer used */
 
     .loading {
       text-align: center;
@@ -266,10 +256,7 @@
       color: #1a1a1a;
     }
 
-    .variant-card button {
-      margin-top: 15px;
-      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-    }
+    /* REMOVED: variant-card button styles */
 
     /* Collapsible form styles */
     .form-collapsible-header {
@@ -493,6 +480,66 @@
       color: #667eea;
       text-align: center;
     }
+    /* Research Viewer Styles (Feature 011) */
+    .research-container {
+      background: linear-gradient(135deg, #e8f4f8 0%, #f0e8ff 100%);
+      padding: 30px;
+      border-radius: 12px;
+      margin: 30px 0;
+      border-left: 5px solid #667eea;
+    }
+    .research-header h2 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    .research-subtitle {
+      color: #666;
+      font-size: 1.05rem;
+      margin-bottom: 20px;
+    }
+    .research-content {
+      background: rgba(255, 255, 255, 0.7);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      line-height: 1.8;
+    }
+    .research-content p {
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .research-actions {
+      text-align: center;
+      margin-top: 25px;
+    }
+    .research-actions button {
+      padding: 15px 30px;
+      font-size: 1.1rem;
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .research-actions button:hover {
+      transform: translateY(-2px);
+    }
+    .research-actions button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .research-next {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(102, 255, 102, 0.2);
+      border-radius: 8px;
+      text-align: center;
+      color: #2d5016;
+      font-weight: 600;
+    }
+
     @media (max-width: 600px) {
       .theme-selector-compact {
         flex-direction: column;
@@ -1186,12 +1233,7 @@
       </button>
     </div>
 
-    <!-- Trip Styles -->
-    <div id="variantsSection" class="variants-section hidden">
-      <h2>Choose Your Trip Style</h2>
-      <p style="color: #666; margin-bottom: 20px;">We've created two different styles for your trip. Review both and select your preference.</p>
-      <div id="variantsContainer"></div>
-    </div>
+    <!-- REMOVED: Old A/B variants section - replaced with template-driven options -->
 
     <!-- Chat Interface -->
     <div id="chatSection" class="chat-section hidden">
@@ -1308,6 +1350,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Feature 011: Research viewer component -->
+  <script src="js/research-viewer.js"></script>
 
   <script type="module" src="js/main.js"></script>
 </body>

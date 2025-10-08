@@ -115,21 +115,40 @@ window.addEventListener('DOMContentLoaded', async () => {
       console.log('[Generate Full Trip] Success:', data);
 
       // Store trip ID
-      if (data.id || data.tripId) {
-        window.currentTripId = data.id || data.tripId;
+      const tripId = data.id || data.tripId;
+      if (tripId) {
+        window.currentTripId = tripId;
       }
 
-      // Display research summary if present
-      if (data.diagnostics && data.diagnostics.research && data.diagnostics.research.length > 0) {
-        console.log('[Generate Full Trip] Displaying research:', data.diagnostics.research);
-        displayResearchSummary(data.diagnostics.research);
-      }
+      // Feature 011: Research-first workflow
+      // Show research viewer, which gates access to trip options
+      const researchContainer = document.getElementById('researchSummary');
+      if (researchContainer) {
+        researchContainer.classList.remove('hidden');
 
-      // Display trip options
-      if (window.displayTripOptions) {
-        displayTripOptions(data);
+        const viewer = new window.ResearchViewer(tripId, () => {
+          console.log('[Research] User acknowledged research, showing options');
+
+          // After research is acknowledged, display trip options
+          if (window.displayTripOptions) {
+            displayTripOptions(data);
+          }
+        });
+
+        viewer.load().then(() => {
+          viewer.render(researchContainer);
+        }).catch(err => {
+          console.error('[Research] Failed to load research:', err);
+          // Fallback: show options anyway
+          if (window.displayTripOptions) {
+            displayTripOptions(data);
+          }
+        });
       } else {
-        alert('Trip generated! ID: ' + (data.id || data.tripId) + '\n\nTrip display UI coming next...');
+        // Fallback: show options if no research container
+        if (window.displayTripOptions) {
+          displayTripOptions(data);
+        }
       }
 
     } catch (error) {
