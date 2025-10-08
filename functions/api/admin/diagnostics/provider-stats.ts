@@ -44,24 +44,24 @@ export async function onRequestGet(context: {
       metadata: { startDate, endDate }
     });
 
-    // Get provider logs grouped by category and level
+    // Get provider logs grouped by operation and severity
     const { results: providerLogs } = await env.DB.prepare(`
       SELECT
-        category,
-        level,
+        operation,
+        severity,
         COUNT(*) as count,
         metadata
       FROM logs
-      WHERE (category IN ('provider', 'amadeus', 'tripadvisor', 'research'))
+      WHERE (operation IN ('provider', 'amadeus', 'tripadvisor', 'research'))
         ${dateFilter}
-      GROUP BY category, level
+      GROUP BY operation, severity
     `).bind(...params).all();
 
     // Get detailed provider call data from metadata
     const { results: detailedLogs } = await env.DB.prepare(`
       SELECT metadata
       FROM logs
-      WHERE (category IN ('provider', 'amadeus', 'tripadvisor'))
+      WHERE (operation IN ('provider', 'amadeus', 'tripadvisor'))
         AND metadata IS NOT NULL
         ${dateFilter}
       LIMIT 1000
@@ -102,10 +102,10 @@ export async function onRequestGet(context: {
 
     // Add error counts from aggregated logs
     for (const log of providerLogs) {
-      if (log.level === 'error') {
-        if (log.category === 'amadeus' && providerStats.amadeus) {
+      if (log.severity === 'ERROR') {
+        if (log.operation === 'amadeus' && providerStats.amadeus) {
           providerStats.amadeus.errors += log.count;
-        } else if (log.category === 'tripadvisor' && providerStats.tripadvisor) {
+        } else if (log.operation === 'tripadvisor' && providerStats.tripadvisor) {
           providerStats.tripadvisor.errors += log.count;
         }
       }

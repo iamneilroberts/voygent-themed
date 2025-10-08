@@ -36,7 +36,7 @@ export async function onRequestGet(context: {
     const { results: recentErrors } = await env.DB.prepare(`
       SELECT COUNT(*) as count
       FROM logs
-      WHERE level = 'error'
+      WHERE severity = 'ERROR'
         AND timestamp > ?
     `).bind(oneHourAgo).all();
 
@@ -73,11 +73,11 @@ export async function onRequestGet(context: {
 
     // Provider health (check recent provider logs)
     const { results: providerLogs } = await env.DB.prepare(`
-      SELECT category, level, COUNT(*) as count
+      SELECT operation as category, severity, COUNT(*) as count
       FROM logs
-      WHERE (category = 'provider' OR category = 'amadeus' OR category = 'tripadvisor')
+      WHERE (operation = 'provider' OR operation = 'amadeus' OR operation = 'tripadvisor')
         AND timestamp > ?
-      GROUP BY category, level
+      GROUP BY operation, severity
     `).bind(oneHourAgo).all();
 
     const providerHealth: any = {};
@@ -86,7 +86,7 @@ export async function onRequestGet(context: {
         providerHealth[log.category] = { total: 0, errors: 0 };
       }
       providerHealth[log.category].total += log.count;
-      if (log.level === 'error') {
+      if (log.severity === 'ERROR') {
         providerHealth[log.category].errors += log.count;
       }
     }

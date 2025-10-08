@@ -30,12 +30,11 @@ export async function onRequestGet(context: {
         id,
         correlation_id,
         timestamp,
-        level,
-        category,
+        severity,
+        operation,
         message,
         metadata,
-        request_id,
-        user_id
+        request_id
       FROM logs
       WHERE correlation_id = ?
     `;
@@ -43,12 +42,12 @@ export async function onRequestGet(context: {
     const params: any[] = [tripId];
 
     if (level !== 'all') {
-      query += ` AND level = ?`;
-      params.push(level);
+      query += ` AND severity = ?`;
+      params.push(level.toUpperCase());
     }
 
     if (category !== 'all') {
-      query += ` AND category = ?`;
+      query += ` AND operation = ?`;
       params.push(category);
     }
 
@@ -68,12 +67,11 @@ export async function onRequestGet(context: {
     const logs = results.map((row: any) => ({
       id: row.id,
       timestamp: row.timestamp,
-      level: row.level,
-      category: row.category,
+      level: row.severity?.toLowerCase() || 'info',
+      category: row.operation,
       message: row.message,
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
-      requestId: row.request_id,
-      userId: row.user_id
+      requestId: row.request_id
     }));
 
     // Log access (non-blocking)
