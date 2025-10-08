@@ -302,3 +302,67 @@ export class Logger {
     return crypto.randomUUID();
   }
 }
+
+/**
+ * Simplified logEvent helper for Feature 011 APIs
+ * Provides a convenient wrapper around Logger.getInstance()
+ */
+export async function logEvent(
+  db: D1Database,
+  data: {
+    correlationId: string;
+    level: 'debug' | 'info' | 'warn' | 'error';
+    category: string;
+    message: string;
+    metadata?: any;
+  }
+): Promise<void> {
+  try {
+    const requestId = `evt_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // Map level to severity
+    const severityMap: Record<string, LogSeverity> = {
+      'debug': 'DEBUG',
+      'info': 'INFO',
+      'warn': 'WARN',
+      'error': 'ERROR'
+    };
+    const severity = severityMap[data.level] || 'INFO';
+
+    const logEntry: LogEntry = {
+      id: crypto.randomUUID(),
+      request_id: requestId,
+      correlation_id: data.correlationId,
+      timestamp: Date.now(),
+      severity,
+      operation: data.category,
+      message: data.message,
+      metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+      duration_ms: null,
+      status: null,
+      agency_id: null,
+      endpoint: null
+    };
+
+    // Write directly to database
+    await db.prepare(
+      `INSERT INTO logs (id, request_id, correlation_id, timestamp, severity, operation, message, metadata, duration_ms, status, agency_id, endpoint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      logEntry.id,
+      logEntry.request_id,
+      logEntry.correlation_id,
+      logEntry.timestamp,
+      logEntry.severity,
+      logEntry.operation,
+      logEntry.message,
+      logEntry.metadata,
+      logEntry.duration_ms,
+      logEntry.status,
+      logEntry.agency_id,
+      logEntry.endpoint
+    ).run();
+  } catch (error) {
+    console.error('[logEvent] Failed to log event:', error);
+    // Fail silently - never throw
+  }
+}
