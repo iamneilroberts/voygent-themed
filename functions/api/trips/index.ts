@@ -304,8 +304,8 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
           ? await tavily.webSearch(env as any, { q: searchQuery, max_results: 5 })
           : null;
 
-        if (searchResult) {
-          console.log(`[STEP 1.5] ✓ Web search returned ${searchResult.results?.length || 0} results`);
+        if (searchResult && searchResult.results && searchResult.results.length > 0) {
+          console.log(`[STEP 1.5] ✓ Web search returned ${searchResult.results.length} results`);
 
           const summary = searchResult.results
             .slice(0, 3)
@@ -318,6 +318,41 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
             summary: summary.substring(0, 800),
             sources: searchResult.results.slice(0, 3).map((r: any) => r.url)
           });
+        } else {
+          console.log(`[STEP 1.5] ✗ Web search returned no results or failed`);
+
+          // FALLBACK: Generate AI-based research summary if web search fails
+          console.log(`[STEP 1.5] Generating AI-based research fallback for: ${surname}`);
+
+          const fallbackPrompt = `Research summary for ${surname} family heritage:
+
+Based on the surname "${surname}"${origins.length > 0 ? ` with suspected origins in ${origins.join(', ')}` : ''}, provide a brief research summary highlighting:
+1. Historical significance and origins of the ${surname} surname
+2. Notable regions or locations associated with this family name
+3. Interesting historical facts or notable ${surname} family members
+4. Key heritage sites or locations worth visiting for ${surname} family research
+
+Keep the response to 3-4 concise paragraphs.`;
+
+          try {
+            const aiProvider = selectProvider(env as any);
+            const aiResponse = await callProvider(env as any, aiProvider, fallbackPrompt, { max_tokens: 500 });
+
+            researchSteps.push({
+              step: 'ai_surname_research',
+              query: searchQuery,
+              summary: aiResponse.content,
+              sources: [],
+              provider: aiProvider.name,
+              tokensIn: aiResponse.tokensIn,
+              tokensOut: aiResponse.tokensOut,
+              cost: aiResponse.costUsd
+            });
+
+            console.log(`[STEP 1.5] ✓ AI research fallback complete`);
+          } catch (aiError) {
+            console.error(`[STEP 1.5] ✗ AI research fallback failed:`, aiError);
+          }
         }
       } catch (error) {
         console.error('[STEP 1.5] ✗ Web search failed:', error);
