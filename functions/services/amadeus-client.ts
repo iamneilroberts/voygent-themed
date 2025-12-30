@@ -4,11 +4,23 @@
  *
  * Integrates with Amadeus API for flights and hotels.
  * Used during Phase 2 to search for real booking options.
+ *
+ * Location codes are fetched from Amadeus Location API and cached in D1.
  */
 
 import { Env } from '../lib/db';
 import { Logger } from '../lib/logger';
 import { CostTracker, API_CALL_COSTS } from '../lib/cost-tracker';
+
+export interface LocationSearchResult {
+  iataCode: string;
+  name: string;
+  subType: 'AIRPORT' | 'CITY';
+  address?: {
+    cityName?: string;
+    countryCode?: string;
+  };
+}
 
 export interface FlightSearchRequest {
   originLocationCode: string;  // e.g., "JFK"
@@ -95,7 +107,8 @@ export class AmadeusClient {
   constructor(
     private apiKey: string,
     private apiSecret: string,
-    private logger: Logger
+    private logger: Logger,
+    private db?: D1Database
   ) {}
 
   /**
@@ -247,48 +260,182 @@ export class AmadeusClient {
   }
 
   /**
-   * Helper: Convert city name to IATA city code
-   * This is a simplified version - in production, use Amadeus Location API
+   * Search Amadeus Location API for city/airport codes
    */
-  getCityCode(cityName: string): string {
-    const cityCodeMap: Record<string, string> = {
-      'cork': 'ORK',
-      'dublin': 'DUB',
-      'galway': 'GWY',
-      'kinsale': 'ORK',  // Use Cork airport
-      'killarney': 'KIR',
-      'new york': 'NYC',
-      'london': 'LON',
-      'paris': 'PAR',
-      'rome': 'ROM',
-      'barcelona': 'BCN',
-      // Add more as needed
-    };
+  async searchLocation(keyword: string, subType: 'CITY' | 'AIRPORT' = 'CITY'): Promise<LocationSearchResult | null> {
+    const token = await this.getAccessToken();
 
-    const normalized = cityName.toLowerCase().trim();
-    return cityCodeMap[normalized] || 'NYC';  // Default to NYC if not found
+    try {
+      this.logger.info(`Searching Amadeus locations for: ${keyword} (${subType})`);
+
+      const params = new URLSearchParams({
+        keyword: keyword,
+        subType: subType,
+        'page[limit]': '1',
+      });
+
+      const response = await fetch(
+        `${this.baseUrl}/v1/reference-data/locations?${params.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.warn(`Amadeus location search failed: ${response.status} - ${errorText}`);
+        return null;
+      }
+
+      const data = await response.json() as { data: LocationSearchResult[] };
+
+      if (data.data && data.data.length > 0) {
+        const result = data.data[0];
+        this.logger.info(`Found location: ${result.name} (${result.iataCode})`);
+        return result;
+      }
+
+      this.logger.warn(`No location found for: ${keyword}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Amadeus location search error: ${error}`);
+      return null;
+    }
   }
 
   /**
-   * Helper: Get airport code from city
+   * Check D1 cache for location code
    */
-  getAirportCode(cityName: string): string {
-    const airportCodeMap: Record<string, string> = {
-      'cork': 'ORK',
-      'dublin': 'DUB',
-      'galway': 'SNN',  // Shannon is closest
-      'kinsale': 'ORK',
-      'killarney': 'KIR',
-      'new york': 'JFK',
-      'london': 'LHR',
-      'paris': 'CDG',
-      'rome': 'FCO',
-      'barcelona': 'BCN',
-      // Add more as needed
-    };
+  private async getCachedLocation(searchTerm: string, locationType: string): Promise<string | null> {
+    if (!this.db) return null;
 
-    const normalized = cityName.toLowerCase().trim();
-    return airportCodeMap[normalized] || 'JFK';
+    try {
+      const result = await this.db
+        .prepare('SELECT iata_code FROM location_cache WHERE search_term = ? AND location_type = ?')
+        .bind(searchTerm.toLowerCase(), locationType)
+        .first<{ iata_code: string }>();
+
+      if (result) {
+        this.logger.debug(`Cache hit for ${searchTerm}: ${result.iata_code}`);
+        return result.iata_code;
+      }
+    } catch (error) {
+      this.logger.warn(`Cache lookup failed: ${error}`);
+    }
+
+    return null;
+  }
+
+  /**
+   * Store location code in D1 cache
+   */
+  private async cacheLocation(
+    searchTerm: string,
+    iataCode: string,
+    locationType: string,
+    locationName?: string,
+    countryCode?: string
+  ): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      await this.db
+        .prepare(`
+          INSERT OR REPLACE INTO location_cache
+          (search_term, iata_code, location_type, location_name, country_code, cached_at)
+          VALUES (?, ?, ?, ?, ?, unixepoch())
+        `)
+        .bind(searchTerm.toLowerCase(), iataCode, locationType, locationName || null, countryCode || null)
+        .run();
+
+      this.logger.debug(`Cached location: ${searchTerm} -> ${iataCode}`);
+    } catch (error) {
+      this.logger.warn(`Cache store failed: ${error}`);
+    }
+  }
+
+  /**
+   * Get city code with caching - checks D1 cache first, then Amadeus API
+   */
+  async getCityCode(cityName: string): Promise<string> {
+    const searchTerm = cityName.toLowerCase().trim();
+
+    // Check cache first
+    const cached = await this.getCachedLocation(searchTerm, 'CITY');
+    if (cached) return cached;
+
+    // Search Amadeus API
+    const result = await this.searchLocation(cityName, 'CITY');
+    if (result) {
+      await this.cacheLocation(
+        searchTerm,
+        result.iataCode,
+        'CITY',
+        result.name,
+        result.address?.countryCode
+      );
+      return result.iataCode;
+    }
+
+    // Fallback: try airport search (some locations only have airport codes)
+    const airportResult = await this.searchLocation(cityName, 'AIRPORT');
+    if (airportResult) {
+      await this.cacheLocation(
+        searchTerm,
+        airportResult.iataCode,
+        'CITY',
+        airportResult.name,
+        airportResult.address?.countryCode
+      );
+      return airportResult.iataCode;
+    }
+
+    // Last resort: return first 3 letters uppercase
+    this.logger.warn(`No city code found for ${cityName}, using fallback`);
+    return searchTerm.substring(0, 3).toUpperCase();
+  }
+
+  /**
+   * Get airport code with caching - checks D1 cache first, then Amadeus API
+   */
+  async getAirportCode(cityName: string): Promise<string> {
+    const searchTerm = cityName.toLowerCase().trim();
+
+    // Check cache first
+    const cached = await this.getCachedLocation(searchTerm, 'AIRPORT');
+    if (cached) return cached;
+
+    // Search Amadeus API for airports
+    const result = await this.searchLocation(cityName, 'AIRPORT');
+    if (result) {
+      await this.cacheLocation(
+        searchTerm,
+        result.iataCode,
+        'AIRPORT',
+        result.name,
+        result.address?.countryCode
+      );
+      return result.iataCode;
+    }
+
+    // Fallback: try city search (might return a city with airport)
+    const cityResult = await this.searchLocation(cityName, 'CITY');
+    if (cityResult) {
+      await this.cacheLocation(
+        searchTerm,
+        cityResult.iataCode,
+        'AIRPORT',
+        cityResult.name,
+        cityResult.address?.countryCode
+      );
+      return cityResult.iataCode;
+    }
+
+    // Last resort fallback
+    this.logger.warn(`No airport code found for ${cityName}, using JFK fallback`);
+    return 'JFK';
   }
 }
 
@@ -300,5 +447,5 @@ export function createAmadeusClient(env: Env, logger: Logger): AmadeusClient {
     throw new Error('Amadeus API credentials not configured');
   }
 
-  return new AmadeusClient(env.AMADEUS_API_KEY, env.AMADEUS_API_SECRET, logger);
+  return new AmadeusClient(env.AMADEUS_API_KEY, env.AMADEUS_API_SECRET, logger, env.DB);
 }

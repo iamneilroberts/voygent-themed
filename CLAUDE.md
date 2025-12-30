@@ -158,64 +158,91 @@ Production database: `voygent-themed` (ID: 62077781-9458-4206-a5c6-f38dc419e599)
 
 ### Recently Completed (This Session)
 
-1. **AI-Powered Context Extraction** - Template placeholders are now extracted using AI:
-   - `functions/lib/template-engine.ts`: Added `extractPlaceholders()` and `buildContextExtractionPrompt()`
-   - `functions/services/research-service.ts`: Added `extractContextWithAI()` method
-   - Each template's placeholders (e.g., `{surname}`, `{region}`, `{show_name}`) are identified and AI extracts values from user input
-   - Logged as `context_extraction` telemetry event
+1. **Dynamic Amadeus Location API with D1 Caching** - Airport/city codes now fetched dynamically:
+   - `db/migrations/0004_create_location_cache.sql`: New table for caching location lookups
+   - `functions/services/amadeus-client.ts`: Added `searchLocation()` method for Amadeus Location API
+   - Implements cache-first strategy: check D1 cache → API call if miss → store result
+   - Supports both AIRPORT and CITY lookups with fallback between them
+   - Eliminates hardcoded airport codes - works for any destination worldwide
 
-2. **Geographic Region Enforcement** - Destination synthesis now respects user's specified region:
-   - Added `CRITICAL GEOGRAPHIC CONSTRAINT` to synthesis prompt when region is extracted
-   - Prevents AI from suggesting US locations when user asks about Ireland, etc.
-   - System prompt dynamically includes region focus
+2. **AI Prompt Destination Constraints** - Fixed AI hallucinating wrong destinations:
+   - **Problem**: AI was generating German/Austrian cities for Scotland trips
+   - **Root cause**: Template `options_prompt` didn't include `{destinations}` placeholder
+   - `functions/services/trip-builder-service.ts`: Added explicit destination list and constraints to prompt:
+     - `CONFIRMED DESTINATIONS (You MUST use these exact locations):`
+     - `CRITICAL REQUIREMENTS:` with rules to only use confirmed destinations
+   - Telemetry now logs destinations passed to AI for debugging
 
-3. **Debug Telemetry Panel** - Replaced sidebar destinations panel with telemetry:
-   - `public/chat.html`: New telemetry panel structure
-   - `public/js/chat.js`: Functions `displayTelemetryLogs()`, `formatTelemetryDetails()`, `addTelemetryEntry()`
-   - `public/css/chat.css`: Color-coded telemetry entries by event type
-   - Shows: AI calls, search queries, context extraction, costs, tokens
-   - Events: `search_queries`, `search_results`, `context_extraction`, `destination_synthesis`, `chat_response`
+3. **Enhanced Trip Options Display** - Better UI for comparing options:
+   - `public/js/chat.js`: Updated `createTripOptionCard()` function
+   - Shows route header (e.g., "Inverness → Dingwall → Stornoway")
+   - Hotel names with city, nights, and star ratings (★★★★)
+   - Tour names with city, duration, and price
+   - `public/css/chat.css`: New styles for option items
 
-4. **Clickable Source Links** - Research summary sources are now hyperlinks:
-   - `public/js/chat.js`: Updated `displayResearchSummary()` to use markdown links
-   - `formatMessageContent()` now converts `[text](url)` to HTML `<a>` tags
+4. **Fixed Infinite Polling Loop** - Option selection now works:
+   - **Problem**: Clicking "Select This Option" caused infinite polling
+   - **Root cause**: `option_selected` status wasn't handled in `loadTripState()`
+   - `public/js/chat.js`: Added handler for `option_selected` status, stops polling
+   - Added `showHandoffOption()` function to display handoff UI after selection
 
-5. **Intake Form Fields Fix** - Trip Details section now populates correctly:
-   - `functions/api/templates/index.ts`: Added `required_fields`, `optional_fields`, `search_help_text` to response
-   - `public/js/intake-form.js`: Fixed `parseFields()` to handle both arrays and JSON strings
-   - Shows: Trip Duration, Departure Airport, and optional fields (travelers, budget, activity level, dates)
+5. **Allow Option Re-selection** - Users can change their mind:
+   - **Problem**: "Trip option already selected" error when choosing different option
+   - `functions/lib/phase-gate.ts`: Removed blocking check in `checkOptionSelectionEligibility()`
+   - Users can now re-select options until handoff is complete
 
-6. **Enhanced Error Logging** - Better debugging for confirm destinations:
-   - `functions/api/trips/[id]/confirm-destinations.ts`: Detailed error messages with stack traces
-   - Logs to telemetry on errors
+### Previously Completed
 
-7. **Chat Telemetry** - All AI calls in chat handler now log telemetry:
-   - `functions/api/trips/[id]/chat.ts`: Added telemetry for destination questions and general chat
+1. **Phase 2 Trip Building Fixed** - The "Build Trip" button now works end-to-end
+2. **Viator API Integration** - Added Viator sandbox API key for tours
+3. **Graceful API Client Fallback** - Amadeus/Viator clients optional
+4. **AI-Powered Context Extraction** - Template placeholders extracted using AI
+5. **Geographic Region Enforcement** - Destinations respect user's specified region
+6. **Debug Telemetry Panel** - Shows AI calls, costs, tokens in sidebar
+7. **Clickable Source Links** - Research sources are hyperlinks
+8. **Intake Form Fields Fix** - Dynamic fields populate correctly
 
 ### Deployment
 - **Preview URL**: https://002-end-to-end.voygent-v3.pages.dev (branch preview)
 - **Production**: https://voygent.app (main branch - needs merge)
 - **Deploy command**: `CLOUDFLARE_API_TOKEN=tBembNqogoxi6cIyJxQB82n4nSKlXhFu4cccmIOF npx wrangler pages deploy public --branch=002-end-to-end`
 
-### Known Working
-- Intake form modal with dynamic fields
+### Known Working (Full E2E Flow)
+- Template selection and intake form
 - AI context extraction for template placeholders
-- Region-constrained destination synthesis (Ireland, not US counties)
-- Telemetry panel showing API calls and costs
-- Clickable source links in research summary
+- Region-constrained destination synthesis
+- Research summary with clickable source links
+- Destination confirmation and Phase 2 trigger
+- Trip options generation with correct destinations
+- Enhanced options display (hotels with ratings, tours with prices)
+- Option selection and re-selection
+- Telemetry panel showing all API calls and costs
 
-### Next Tasks (Priority Order)
-1. **Test "Build Trip" button** - Currently fails with error, needs debugging
-   - Error happens in `confirm-destinations.ts` - check validation logic
-   - May be mismatch between `research_destinations` names and `confirmed_destinations`
-2. **End-to-end flow test** - Complete a full trip from intake to destination confirmation
-3. **Phase 2 trip building** - Test Amadeus/Viator integration after destination confirmation
-4. **Merge to main** - Once stable, merge 002-end-to-end branch to main for production
+### Suggested Improvements (Priority Order)
+
+#### High Priority - Core Flow
+1. **Test handoff flow** - Verify `/api/trips/:id/handoff` endpoint works
+2. **Real Amadeus/Viator data** - Currently using sandbox/test APIs; test with production keys
+3. **Apply location_cache migration to production** - Run `npm run db:migrate:prod`
+4. **Merge to main** - Deploy to production once stable
+
+#### Medium Priority - UX Improvements
+5. **Add loading states during Phase 2** - Show skeleton cards while options generate
+6. **Improve error handling UI** - Show user-friendly errors instead of "Trip building failed"
+7. **Add "Edit Destinations" option** - Let users modify destinations before building
+8. **Show actual booking links** - Hotels/tours should link to real booking pages when available
+9. **Add trip summary/export** - PDF or email summary of selected trip option
+10. **Mobile responsive design** - Current UI needs mobile optimization
+
+#### Lower Priority - Features
+11. **User accounts** - Save trips, preferences, search history
+12. **Multi-traveler support** - Share trip with travel companions
+13. **Price alerts** - Notify when flight/hotel prices change
+14. **Calendar integration** - Export itinerary to Google/Apple Calendar
+15. **Chat continuation** - Allow follow-up questions about trip options
 
 ### Known Issues
-- **Build Trip Error**: "Failed to confirm destinations" - needs investigation
-  - Validation at line 62-77 in confirm-destinations.ts checks destination names match
-  - Frontend sends `research_destinations.map(d => d.name)` as confirmed destinations
-  - Better error logging added - check telemetry for `confirm_error` event
 - Duplicate Heritage template exists (heritage-001 and heritage-ancestry-001) - clean up in seeds
 - Production (main branch) doesn't have latest changes - need to merge 002-end-to-end
+- Amadeus test API may have limited data for some destinations
+- Viator sandbox returns limited tour results

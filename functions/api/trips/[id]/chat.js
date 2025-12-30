@@ -104,6 +104,14 @@ Provide a helpful, friendly response to their question about these destinations.
                     maxTokens: 500,
                     temperature: 0.8,
                 }, costTracker);
+                // Log telemetry for this AI call
+                await logger.logTelemetry(db, tripId, 'chat_response', {
+                    provider: response.provider,
+                    model: response.model,
+                    tokens: response.totalTokens,
+                    cost: response.cost,
+                    details: { context: 'destination_question', message_preview: body.message.substring(0, 50) },
+                });
                 aiResponse = response.text;
             }
         }
@@ -133,6 +141,14 @@ Provide a helpful, friendly response. If the user is ready to see destination re
                 maxTokens: 500,
                 temperature: 0.8,
             }, costTracker);
+            // Log telemetry for this AI call
+            await logger.logTelemetry(db, tripId, 'chat_response', {
+                provider: response.provider,
+                model: response.model,
+                tokens: response.totalTokens,
+                cost: response.cost,
+                details: { context: 'general_chat', message_preview: body.message.substring(0, 50) },
+            });
             aiResponse = response.text;
         }
         // Save assistant message to chat history

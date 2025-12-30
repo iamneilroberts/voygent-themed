@@ -169,18 +169,8 @@ export class PhaseGate {
       };
     }
 
-    // Check if already selected
-    if (trip.selected_option_index !== null && trip.selected_option_index !== undefined) {
-      return {
-        allowed: false,
-        trip,
-        error: {
-          code: 'ALREADY_SELECTED',
-          message: 'Trip option already selected',
-          requiresConfirmation: false,
-        },
-      };
-    }
+    // Allow re-selection until handoff is complete
+    // Users can change their mind before finalizing with a travel agent
 
     return {
       allowed: true,

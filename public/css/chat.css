@@ -420,3 +420,87 @@
   width: 100%;
   margin-top: var(--spacing-sm);
 }
+
+/* Enhanced trip option styles */
+.trip-option-route {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+}
+
+.trip-option-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+
+.flight-summary {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.hotels-list,
+.tours-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.option-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+}
+
+.option-item .item-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.option-item .item-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.option-item-empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Handoff Container */
+.handoff-container {
+  padding: var(--spacing-md);
+  background-color: var(--background);
+  border-top: 1px solid var(--border);
+}
+
+.handoff-card {
+  background-color: #f0fdf4;
+  border: 2px solid var(--success-color);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-lg);
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.handoff-card h3 {
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-primary);
+}
+
+.handoff-card p {
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.handoff-card button {
+  margin-top: var(--spacing-sm);
+}

@@ -167,6 +167,83 @@ export class TemplateEngine {
             exampleInputs: template.example_inputs ? JSON.parse(template.example_inputs) : [],
         };
     }
+    /**
+     * Extract all unique placeholder names from template research fields
+     *
+     * @param template - Template with research prompts
+     * @returns Array of unique placeholder names (without braces)
+     *
+     * @example
+     * // Template has: "{surname} {region} history", "{surname} genealogy"
+     * extractPlaceholders(template) // => ["surname", "region"]
+     */
+    extractPlaceholders(template) {
+        const fieldsToSearch = [
+            template.research_query_template,
+            template.destination_criteria_prompt,
+            template.research_synthesis_prompt,
+        ];
+        const placeholders = new Set();
+        const placeholderRegex = /\{([a-z_]+)\}/g;
+        fieldsToSearch.forEach((field) => {
+            if (!field)
+                return;
+            let match;
+            while ((match = placeholderRegex.exec(field)) !== null) {
+                // Exclude common system placeholders that come from preferences
+                const name = match[1];
+                if (!['number_of_options', 'departure_airport', 'luxury_level', 'activity_level'].includes(name)) {
+                    placeholders.add(name);
+                }
+            }
+        });
+        return Array.from(placeholders);
+    }
+    /**
+     * Build AI prompt for extracting context values from user message
+     *
+     * @param template - Template to get theme context
+     * @param placeholders - Placeholder names to extract
+     * @param userMessage - User's input message
+     * @returns Prompt for AI extraction
+     */
+    buildContextExtractionPrompt(template, placeholders, userMessage) {
+        const exampleInputs = template.example_inputs
+            ? JSON.parse(template.example_inputs).slice(0, 3).join(', ')
+            : '';
+        return `You are extracting structured data from a user's travel request for a "${template.name}" themed trip.
+
+User's message: "${userMessage}"
+
+Theme description: ${template.description}
+Example inputs for this theme: ${exampleInputs}
+
+Extract values for these fields from the user's message:
+${placeholders.map((p) => `- ${p}: ${this.getPlaceholderDescription(p)}`).join('\n')}
+
+IMPORTANT: Respond with ONLY a valid JSON object. Use null for any field you cannot determine from the message.
+
+Example response format:
+{
+${placeholders.map((p) => `  "${p}": "extracted value or null"`).join(',\n')}
+}`;
+    }
+    /**
+     * Get human-readable description for a placeholder
+     */
+    getPlaceholderDescription(placeholder) {
+        const descriptions = {
+            surname: 'Family surname being researched',
+            region: 'Geographic region, country, or area mentioned',
+            destination: 'Travel destination or place',
+            show_name: 'TV show or movie title',
+            historical_topic: 'Historical period, event, or theme',
+            cuisine: 'Type of cuisine or food',
+            activity: 'Outdoor activity or adventure type',
+            topic: 'Main topic or subject of the trip',
+        };
+        return descriptions[placeholder] || `The ${placeholder.replace(/_/g, ' ')} mentioned`;
+    }
 }
 /**
  * Create template engine instance

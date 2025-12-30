@@ -86,6 +86,12 @@ export class DatabaseClient {
             .bind(JSON.stringify(destinations), id)
             .run();
     }
+    async updateResearchSummary(id, summary) {
+        await this.db
+            .prepare('UPDATE themed_trips SET research_summary = ?, updated_at = unixepoch() WHERE id = ?')
+            .bind(JSON.stringify(summary), id)
+            .run();
+    }
     async updatePreferences(id, preferences) {
         await this.db
             .prepare('UPDATE themed_trips SET preferences_json = ?, updated_at = unixepoch() WHERE id = ?')

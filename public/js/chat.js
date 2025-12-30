@@ -162,12 +162,75 @@ async function loadTripState() {
     }
 
     // Update trip options
-    if (trip.status === 'options_ready' && trip.options) {
+    if ((trip.status === 'options_ready' || trip.status === 'option_selected') && trip.options) {
       updateTripOptions(trip.options, trip.selected_option_index);
+
+      // If option is selected, show confirmation and stop polling
+      if (trip.status === 'option_selected' && trip.selected_option_index) {
+        // Stop polling - user has made their selection
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+
+        // Show handoff option if not already shown
+        showHandoffOption(trip);
+      }
     }
   } catch (error) {
     console.error('Failed to load trip state:', error);
   }
+}
+
+/**
+ * Show handoff option after selection
+ */
+function showHandoffOption(trip) {
+  // Remove existing handoff UI if present (for re-selection)
+  const existing = document.getElementById('handoffContainer');
+  if (existing) {
+    existing.remove();
+  }
+
+  const selectedOption = trip.options.find(o => o.option_index === trip.selected_option_index);
+  if (!selectedOption) return;
+
+  const handoffContainer = document.createElement('div');
+  handoffContainer.id = 'handoffContainer';
+  handoffContainer.className = 'handoff-container';
+  handoffContainer.innerHTML = `
+    <div class="handoff-card">
+      <h3>🎉 Option ${trip.selected_option_index} Selected!</h3>
+      <p>Total: <strong>$${selectedOption.total_cost_usd.toFixed(0)}</strong></p>
+      <p>Ready to book? Hand off to a travel agent to finalize your trip.</p>
+      <button id="handoffBtn" class="btn btn-primary">Request Agent Handoff</button>
+    </div>
+  `;
+
+  // Insert after trip options
+  const tripOptionsContainer = document.getElementById('tripOptionsContainer');
+  tripOptionsContainer.parentNode.insertBefore(handoffContainer, tripOptionsContainer.nextSibling);
+
+  // Add handoff button handler
+  document.getElementById('handoffBtn').addEventListener('click', async () => {
+    try {
+      const btn = document.getElementById('handoffBtn');
+      btn.disabled = true;
+      btn.textContent = 'Generating handoff...';
+
+      addTelemetryEntry('api', 'Requesting handoff');
+
+      const result = await apiClient.generateHandoff(tripId);
+
+      addMessageToChat('assistant', `Your trip has been handed off to a travel agent! Reference: ${result.handoff_id || 'Generated'}`);
+      btn.textContent = 'Handoff Complete ✓';
+    } catch (error) {
+      console.error('Handoff failed:', error);
+      alert('Failed to generate handoff. Please try again.');
+      document.getElementById('handoffBtn').disabled = false;
+      document.getElementById('handoffBtn').textContent = 'Request Agent Handoff';
+    }
+  });
 }
 
 /**
@@ -464,8 +527,43 @@ function createTripOptionCard(option, selectedOptionIndex) {
 
   const flightOutbound = option.flights?.outbound || {};
   const flightReturn = option.flights?.return || {};
-  const hotelCount = option.hotels?.length || 0;
-  const tourCount = option.tours?.length || 0;
+  const hotels = option.hotels || [];
+  const tours = option.tours || [];
+
+  // Format flight as single line
+  const flightLine = flightOutbound.route
+    ? `${flightOutbound.route} round-trip`
+    : 'Flights TBD';
+
+  // Format hotels with names and ratings
+  const hotelsHtml = hotels.length > 0
+    ? hotels.map(h => {
+        const stars = h.rating ? '★'.repeat(h.rating) : '';
+        const nights = h.nights ? ` (${h.nights} nights)` : '';
+        return `<div class="option-item">
+          <span class="item-name">${h.name || 'Hotel'}</span>
+          <span class="item-meta">${h.city}${nights} ${stars}</span>
+        </div>`;
+      }).join('')
+    : '<div class="option-item-empty">Hotels TBD</div>';
+
+  // Format tours with names
+  const toursHtml = tours.length > 0
+    ? tours.map(t => {
+        const duration = t.duration || '';
+        const cost = t.cost_usd ? `$${t.cost_usd}` : '';
+        return `<div class="option-item">
+          <span class="item-name">${t.name || 'Tour'}</span>
+          <span class="item-meta">${t.city || ''} ${duration} ${cost}</span>
+        </div>`;
+      }).join('')
+    : '<div class="option-item-empty">Tours TBD</div>';
+
+  // Extract destinations from hotels
+  const destinations = [...new Set(hotels.map(h => h.city).filter(Boolean))];
+  const destinationsText = destinations.length > 0
+    ? destinations.join(' → ')
+    : 'Destinations TBD';
 
   card.innerHTML = `
     <div class="trip-option-header">
@@ -473,32 +571,33 @@ function createTripOptionCard(option, selectedOptionIndex) {
       <span class="trip-option-price">$${option.total_cost_usd.toFixed(0)}</span>
     </div>
 
+    <div class="trip-option-route">${destinationsText}</div>
+
     <div class="trip-option-details">
       <div class="trip-option-section">
-        <div class="trip-option-section-title">Flights</div>
-        <div class="trip-option-section-content">
-          ${flightOutbound.airline || 'TBD'}: ${flightOutbound.route || 'TBD'}<br>
-          ${flightReturn.airline || 'TBD'}: ${flightReturn.route || 'TBD'}
+        <div class="trip-option-section-title">✈️ Flights</div>
+        <div class="trip-option-section-content flight-summary">
+          ${flightLine}
         </div>
       </div>
 
       <div class="trip-option-section">
-        <div class="trip-option-section-title">Accommodation</div>
-        <div class="trip-option-section-content">
-          ${hotelCount} hotel${hotelCount !== 1 ? 's' : ''} selected
+        <div class="trip-option-section-title">🏨 Accommodation</div>
+        <div class="trip-option-section-content hotels-list">
+          ${hotelsHtml}
         </div>
       </div>
 
       <div class="trip-option-section">
-        <div class="trip-option-section-title">Tours & Activities</div>
-        <div class="trip-option-section-content">
-          ${tourCount} experience${tourCount !== 1 ? 's' : ''} included
+        <div class="trip-option-section-title">🎯 Tours & Activities</div>
+        <div class="trip-option-section-content tours-list">
+          ${toursHtml}
         </div>
       </div>
     </div>
 
     <div class="trip-option-highlights">
-      ${option.itinerary_highlights || 'Detailed itinerary available after selection'}
+      <strong>Highlights:</strong> ${option.itinerary_highlights || 'Explore historic sites, local culture, and scenic landscapes'}
     </div>
 
     <button class="btn btn-primary trip-option-select-btn" data-option-index="${option.option_index}">

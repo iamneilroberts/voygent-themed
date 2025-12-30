@@ -21,6 +21,9 @@ export async function onRequestGet(context) {
         const researchDestinations = trip.research_destinations
             ? JSON.parse(trip.research_destinations)
             : [];
+        const researchSummary = trip.research_summary
+            ? JSON.parse(trip.research_summary)
+            : undefined;
         const confirmedDestinations = trip.confirmed_destinations
             ? JSON.parse(trip.confirmed_destinations)
             : [];
@@ -30,6 +33,16 @@ export async function onRequestGet(context) {
         const userPreferences = trip.preferences_json
             ? JSON.parse(trip.preferences_json)
             : undefined;
+        // Parse telemetry logs
+        let telemetryLogs = [];
+        if (trip.telemetry_logs) {
+            try {
+                telemetryLogs = JSON.parse(trip.telemetry_logs);
+            }
+            catch (e) {
+                // Ignore parse errors
+            }
+        }
         // Build response
         const response = {
             trip_id: trip.id,
@@ -38,6 +51,7 @@ export async function onRequestGet(context) {
             progress_message: trip.progress_message,
             progress_percent: trip.progress_percent,
             // Phase 1 data
+            research_summary: researchSummary,
             research_destinations: researchDestinations,
             destinations_confirmed: trip.destinations_confirmed === 1,
             confirmed_destinations: confirmedDestinations,
@@ -47,6 +61,10 @@ export async function onRequestGet(context) {
             options: options,
             selected_option_index: trip.selected_option_index,
             total_cost_usd: trip.total_cost_usd,
+            // Telemetry (for debug panel)
+            ai_cost_usd: trip.ai_cost_usd,
+            api_cost_usd: trip.api_cost_usd,
+            telemetry_logs: telemetryLogs,
             created_at: trip.created_at,
             updated_at: trip.updated_at,
         };

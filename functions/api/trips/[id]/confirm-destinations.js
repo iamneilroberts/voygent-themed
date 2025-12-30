@@ -12,9 +12,11 @@ export async function onRequestPost(context) {
     const db = createDatabaseClient(context.env);
     const phaseGate = createPhaseGate(db, logger);
     const tripId = context.params.id;
+    logger.info(`=== CONFIRM DESTINATIONS START: trip ${tripId} ===`);
     try {
         // Parse request body
         const body = await context.request.json();
+        logger.info(`Request body: ${JSON.stringify(body)}`);
         if (!body.confirmed_destinations || body.confirmed_destinations.length === 0) {
             return new Response(JSON.stringify({ error: 'confirmed_destinations array cannot be empty' }), {
                 status: 400,
@@ -71,15 +73,31 @@ export async function onRequestPost(context) {
             ? { ...(trip.preferences_json ? JSON.parse(trip.preferences_json) : {}), ...body.preferences }
             : (trip.preferences_json ? JSON.parse(trip.preferences_json) : {});
         // Trigger Phase 2 trip building in background (async)
-        const tripBuilderService = createTripBuilderService(context.env, db, logger);
-        tripBuilderService.buildTripOptions({
+        logger.info(`Creating TripBuilderService for trip ${tripId}...`);
+        let tripBuilderService;
+        try {
+            tripBuilderService = createTripBuilderService(context.env, db, logger);
+            logger.info(`TripBuilderService created successfully`);
+        }
+        catch (serviceError) {
+            logger.error(`Failed to create TripBuilderService: ${serviceError}`);
+            await logger.logTelemetry(db, tripId, 'phase2_service_error', {
+                details: { error: String(serviceError) }
+            });
+            throw serviceError;
+        }
+        // Use waitUntil to ensure trip building completes even after response is sent
+        context.waitUntil(tripBuilderService.buildTripOptions({
             tripId,
             template,
             confirmedDestinations: body.confirmed_destinations,
             preferences: finalPreferences,
-        }).catch((error) => {
+        }).catch(async (error) => {
             logger.error(`Background trip building failed for trip ${tripId}: ${error}`);
-        });
+            await logger.logTelemetry(db, tripId, 'phase2_error', {
+                details: { error: String(error), stack: error instanceof Error ? error.stack : '' }
+            });
+        }));
         return new Response(JSON.stringify({
             status: 'building_trip',
             progress_message: 'Finding flights and hotels...',
@@ -93,8 +111,14 @@ export async function onRequestPost(context) {
         });
     }
     catch (error) {
-        logger.error(`Failed to confirm destinations for trip ${tripId}: ${error}`);
-        return new Response(JSON.stringify({ error: 'Failed to confirm destinations' }), {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : '';
+        logger.error(`Failed to confirm destinations for trip ${tripId}: ${errorMessage}\n${errorStack}`);
+        // Log to telemetry for debugging
+        await logger.logTelemetry(db, tripId, 'confirm_error', {
+            details: { error: errorMessage },
+        });
+        return new Response(JSON.stringify({ error: `Failed to confirm destinations: ${errorMessage}` }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
         });

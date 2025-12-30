@@ -14,7 +14,7 @@ interface ConfirmDestinationsRequest {
   preferences?: TripPreferences;
 }
 
-export async function onRequestPost(context: { request: Request; env: Env; params: { id: string } }): Promise<Response> {
+export async function onRequestPost(context: { request: Request; env: Env; params: { id: string }; waitUntil: (promise: Promise<any>) => void }): Promise<Response> {
   const logger = createLogger();
   const db = createDatabaseClient(context.env);
   const phaseGate = createPhaseGate(db, logger);
@@ -107,15 +107,34 @@ export async function onRequestPost(context: { request: Request; env: Env; param
       : (trip.preferences_json ? JSON.parse(trip.preferences_json) : {});
 
     // Trigger Phase 2 trip building in background (async)
-    const tripBuilderService = createTripBuilderService(context.env, db, logger);
-    tripBuilderService.buildTripOptions({
-      tripId,
-      template,
-      confirmedDestinations: body.confirmed_destinations,
-      preferences: finalPreferences,
-    }).catch((error) => {
-      logger.error(`Background trip building failed for trip ${tripId}: ${error}`);
-    });
+    logger.info(`Creating TripBuilderService for trip ${tripId}...`);
+
+    let tripBuilderService;
+    try {
+      tripBuilderService = createTripBuilderService(context.env, db, logger);
+      logger.info(`TripBuilderService created successfully`);
+    } catch (serviceError) {
+      logger.error(`Failed to create TripBuilderService: ${serviceError}`);
+      await logger.logTelemetry(db, tripId, 'phase2_service_error', {
+        details: { error: String(serviceError) }
+      });
+      throw serviceError;
+    }
+
+    // Use waitUntil to ensure trip building completes even after response is sent
+    context.waitUntil(
+      tripBuilderService.buildTripOptions({
+        tripId,
+        template,
+        confirmedDestinations: body.confirmed_destinations,
+        preferences: finalPreferences,
+      }).catch(async (error) => {
+        logger.error(`Background trip building failed for trip ${tripId}: ${error}`);
+        await logger.logTelemetry(db, tripId, 'phase2_error', {
+          details: { error: String(error), stack: error instanceof Error ? error.stack : '' }
+        });
+      })
+    );
 
     return new Response(
       JSON.stringify({

@@ -35,8 +35,8 @@ export interface TripBuildResult {
 export class TripBuilderService {
   private templateEngine: TemplateEngine;
   private aiProvider: AIProviderManager;
-  private amadeusClient: AmadeusClient;
-  private viatorClient: ViatorClient;
+  private amadeusClient: AmadeusClient | null = null;
+  private viatorClient: ViatorClient | null = null;
 
   constructor(
     private env: Env,
@@ -45,8 +45,19 @@ export class TripBuilderService {
   ) {
     this.templateEngine = createTemplateEngine();
     this.aiProvider = createAIProviderManager(env, logger);
-    this.amadeusClient = createAmadeusClient(env, logger);
-    this.viatorClient = createViatorClient(env, logger);
+
+    // Create clients with graceful fallback if API keys not configured
+    try {
+      this.amadeusClient = createAmadeusClient(env, logger);
+    } catch (error) {
+      this.logger.warn(`Amadeus client not available: ${error}`);
+    }
+
+    try {
+      this.viatorClient = createViatorClient(env, logger);
+    } catch (error) {
+      this.logger.warn(`Viator client not available: ${error}`);
+    }
   }
 
   /**
@@ -54,7 +65,20 @@ export class TripBuilderService {
    */
   async buildTripOptions(request: TripBuildRequest): Promise<TripBuildResult> {
     const { tripId, template, confirmedDestinations, preferences } = request;
+
+    this.logger.info(`=== PHASE 2 START: Building trip options for ${tripId} ===`);
+    this.logger.info(`Amadeus available: ${!!this.amadeusClient}, Viator available: ${!!this.viatorClient}`);
+
     const costTracker = createCostTracker(this.db, this.logger, tripId);
+
+    // Log that Phase 2 started
+    await this.logger.logTelemetry(this.db, tripId, 'phase2_start', {
+      details: {
+        destinations: confirmedDestinations,
+        amadeusAvailable: !!this.amadeusClient,
+        viatorAvailable: !!this.viatorClient,
+      }
+    });
 
     await this.logger.logUserProgress(this.db, tripId, 'Searching for flights...', 20);
 
@@ -107,6 +131,11 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<FlightOffer[]> {
+    if (!this.amadeusClient) {
+      this.logger.warn('Amadeus client not available, skipping flight search');
+      return [];
+    }
+
     if (!preferences.departure_airport) {
       this.logger.warn('No departure airport specified, skipping flight search');
       return [];
@@ -114,7 +143,7 @@ export class TripBuilderService {
 
     // Search for round-trip flights to primary destination
     const primaryDestination = destinations[0];
-    const destinationAirport = this.amadeusClient.getAirportCode(primaryDestination);
+    const destinationAirport = await this.amadeusClient.getAirportCode(primaryDestination);
 
     // Calculate dates (for demo, use 30 days from now)
     const departureDate = preferences.departure_date || this.getDefaultDepartureDate();
@@ -146,6 +175,11 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<HotelOffer[]> {
+    if (!this.amadeusClient) {
+      this.logger.warn('Amadeus client not available, skipping hotel search');
+      return [];
+    }
+
     const allHotels: HotelOffer[] = [];
 
     const departureDate = preferences.departure_date || this.getDefaultDepartureDate();
@@ -155,7 +189,7 @@ export class TripBuilderService {
     let currentDate = new Date(departureDate);
 
     for (const destination of destinations) {
-      const cityCode = this.amadeusClient.getCityCode(destination);
+      const cityCode = await this.amadeusClient.getCityCode(destination);
       const checkInDate = this.formatDate(currentDate);
       const checkOutDate = this.formatDate(new Date(currentDate.getTime() + daysPerDestination * 24 * 60 * 60 * 1000));
 
@@ -188,6 +222,11 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<TourProduct[]> {
+    if (!this.viatorClient) {
+      this.logger.warn('Viator client not available, skipping tour search');
+      return [];
+    }
+
     const allTours: TourProduct[] = [];
 
     for (const destination of destinations) {
@@ -237,6 +276,9 @@ export class TripBuilderService {
 
     const prompt = `${optionsPrompt}
 
+CONFIRMED DESTINATIONS (You MUST use these exact locations):
+${destinations.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+
 Available booking options:
 
 FLIGHTS:
@@ -248,7 +290,12 @@ ${bookingContext.hotels}
 TOURS:
 ${bookingContext.tours}
 
-IMPORTANT: Generate exactly ${template.number_of_options} trip options as a JSON array. Each option must include flights, hotels, tours, and total cost.
+CRITICAL REQUIREMENTS:
+1. Generate exactly ${template.number_of_options} trip options as a JSON array
+2. ALL hotels and tours MUST be in the CONFIRMED DESTINATIONS listed above
+3. Do NOT use any other destinations - ONLY ${destinations.join(', ')}
+4. If booking data is unavailable, create realistic placeholder names for hotels/tours in those specific destinations
+5. Each option must include flights, hotels, tours, and total cost
 
 Format:
 [
@@ -256,16 +303,16 @@ Format:
     "option_index": 1,
     "total_cost_usd": 3500.00,
     "flights": {
-      "outbound": { "airline": "Aer Lingus", "route": "JFK → ORK", "departure": "2025-06-01T10:00", "arrival": "2025-06-01T22:00" },
-      "return": { "airline": "Aer Lingus", "route": "ORK → JFK", "departure": "2025-06-08T12:00", "arrival": "2025-06-08T15:00" }
+      "outbound": { "airline": "British Airways", "route": "JFK → EDI", "departure": "2025-06-01T10:00", "arrival": "2025-06-01T22:00" },
+      "return": { "airline": "British Airways", "route": "EDI → JFK", "departure": "2025-06-08T12:00", "arrival": "2025-06-08T15:00" }
     },
     "hotels": [
-      { "city": "Cork", "name": "Hayfield Manor", "rating": 4, "nights": 4, "cost_per_night_usd": 180.00 }
+      { "city": "${destinations[0] || 'Destination 1'}", "name": "Hotel Name", "rating": 4, "nights": 4, "cost_per_night_usd": 180.00 }
     ],
     "tours": [
-      { "city": "Cork", "name": "Heritage Walking Tour", "duration": "3 hours", "cost_usd": 45.00 }
+      { "city": "${destinations[0] || 'Destination 1'}", "name": "Heritage Tour", "duration": "3 hours", "cost_usd": 45.00 }
     ],
-    "itinerary_highlights": "Explore Cork archives, visit Kinsale Fort, tour Blarney Castle"
+    "itinerary_highlights": "Brief description of activities in ${destinations.join(', ')}"
   }
 ]`;
 
@@ -281,6 +328,12 @@ Format:
       model: aiResponse.model,
       tokens: aiResponse.totalTokens,
       cost: aiResponse.cost,
+      details: {
+        destinations: destinations,
+        flightsFound: flights.length,
+        hotelsFound: hotels.length,
+        toursFound: tours.length,
+      }
     });
 
     // Parse JSON response
@@ -326,7 +379,7 @@ Format:
 
     let toursContext = '';
     tours.slice(0, 10).forEach((tour, index) => {
-      const duration = this.viatorClient.formatDuration(tour.duration.fixedDurationInMinutes);
+      const duration = this.viatorClient?.formatDuration(tour.duration.fixedDurationInMinutes) || 'Duration varies';
       toursContext += `${index + 1}. ${tour.title} - ${duration} - $${tour.pricing.summary.fromPrice}\n`;
     });
 
