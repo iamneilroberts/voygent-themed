@@ -123,13 +123,13 @@ export class ZAIProvider implements AIProvider {
 
 /**
  * OpenRouter Provider (Fallback)
- * OPTIMIZATION: Using gemini-flash-1.5 for faster response times
+ * OPTIMIZATION: Using llama-3.1-8b for faster response times (was claude-3-haiku)
  */
 export class OpenRouterProvider implements AIProvider {
   name = 'OpenRouter';
-  model = 'google/gemini-flash-1.5';  // Much faster than claude-3-haiku
-  costPer1kInputTokens = 0.000075;
-  costPer1kOutputTokens = 0.0003;
+  model = 'meta-llama/llama-3.1-8b-instruct';  // Fast and reliable
+  costPer1kInputTokens = 0.00005;
+  costPer1kOutputTokens = 0.00005;
 
   constructor(private apiKey: string, private logger: Logger) {}
 
