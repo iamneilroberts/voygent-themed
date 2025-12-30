@@ -44,7 +44,7 @@ INSERT OR REPLACE INTO trip_templates (
   '["Budget", "Comfort", "Luxury"]',
   '["Relaxed", "Moderate", "Active"]',
   '["duration", "departure_airport"]',
-  '["travelers_adults", "travelers_children", "luxury_level", "activity_level", "departure_date"]',
+  '["travelers_adults", "travelers_children", "traveler_ages", "luxury_level", "activity_level", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',
   '["Game of Thrones in Croatia", "Lord of the Rings New Zealand", "Harry Potter UK locations", "Breaking Bad Albuquerque"]',
   1
 );
@@ -91,7 +91,7 @@ INSERT OR REPLACE INTO trip_templates (
   '["Budget", "Comfort", "Luxury"]',
   '["Relaxed", "Moderate", "Active"]',
   '["duration", "departure_airport"]',
-  '["travelers_adults", "travelers_children", "luxury_level", "activity_level", "departure_date"]',
+  '["travelers_adults", "travelers_children", "traveler_ages", "luxury_level", "activity_level", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',
   '["WWII Normandy D-Day beaches", "Roman Empire sites in Italy", "American Civil War battlefields", "Ancient Egypt pyramids and temples"]',
   1
 );
@@ -138,7 +138,7 @@ INSERT OR REPLACE INTO trip_templates (
   '["Budget", "Comfort", "Luxury"]',
   '["Relaxed", "Moderate", "Active"]',
   '["duration", "departure_airport"]',
-  '["travelers_adults", "travelers_children", "luxury_level", "dietary_restrictions", "departure_date"]',
+  '["travelers_adults", "travelers_children", "traveler_ages", "luxury_level", "dietary_restrictions", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',
   '["Italian cuisine in Tuscany", "Japanese food culture in Tokyo", "French wine and cheese in Bordeaux", "Street food tour in Bangkok"]',
   1
 );
@@ -185,7 +185,7 @@ INSERT OR REPLACE INTO trip_templates (
   '["Budget", "Comfort", "Luxury"]',
   '["Moderate", "Active", "Intense"]',
   '["duration", "departure_airport", "activity_level"]',
-  '["travelers_adults", "fitness_level", "experience_level", "departure_date"]',
+  '["travelers_adults", "travelers_children", "traveler_ages", "fitness_level", "experience_level", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',
   '["Hiking Patagonia Torres del Paine", "Safari in Tanzania", "Scuba diving Great Barrier Reef", "Trekking to Everest Base Camp"]',
   1
 );
@@ -232,7 +232,7 @@ INSERT OR REPLACE INTO trip_templates (
   '["Comfort", "Luxury", "Ultra-Luxury"]',
   '["Relaxed", "Moderate"]',
   '["duration", "departure_airport"]',
-  '["occasion", "luxury_level", "interests", "departure_date"]',
+  '["occasion", "luxury_level", "interests", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',
   '["Honeymoon in Maldives", "Anniversary in Paris", "Romantic escape to Santorini", "Couples retreat in Bali"]',
   1
 );

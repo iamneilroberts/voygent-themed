@@ -112,6 +112,38 @@ const IntakeForm = {
       ],
       default: 'some_experience',
     },
+    // Transportation preferences
+    transportation_preference: {
+      label: 'Transportation Preference',
+      type: 'select',
+      options: [
+        { value: 'flexible', label: 'Flexible / No Preference' },
+        { value: 'rental_car', label: 'Rental Car (Self-Drive)' },
+        { value: 'public_transit', label: 'Public Transit (Trains, Buses)' },
+        { value: 'driver_hire', label: 'Private Driver / Tour Services' },
+      ],
+      default: 'flexible',
+    },
+    driving_comfort: {
+      label: 'Driving Abroad Comfort',
+      type: 'select',
+      options: [
+        { value: 'comfortable_abroad', label: 'Comfortable driving anywhere' },
+        { value: 'prefer_familiar', label: 'Prefer familiar (same driving side)' },
+        { value: 'no_driving', label: 'Prefer not to drive' },
+      ],
+      default: 'prefer_familiar',
+    },
+    home_country: {
+      label: 'Home Country',
+      type: 'text',
+      placeholder: 'e.g., US, UK, Australia',
+    },
+    traveler_ages: {
+      label: 'Traveler Ages',
+      type: 'text',
+      placeholder: 'e.g., 55, 53, 25, 8',
+    },
   },
 
   /**

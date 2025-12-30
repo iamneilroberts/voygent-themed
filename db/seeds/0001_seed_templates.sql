@@ -76,7 +76,7 @@ INSERT OR REPLACE INTO trip_templates (
 
   -- Required/Optional Fields
   '["duration", "departure_airport"]',  -- required_fields (JSON)
-  '["travelers_adults", "travelers_children", "luxury_level", "activity_level", "departure_date"]',  -- optional_fields (JSON)
+  '["travelers_adults", "travelers_children", "traveler_ages", "luxury_level", "activity_level", "departure_date", "home_country", "transportation_preference", "driving_comfort"]',  -- optional_fields (JSON)
 
   -- Example Inputs
   '["Sullivan family from Cork, Ireland", "Searching for my Italian roots in Tuscany", "Polish ancestry, grandmother from Krakow", "Scottish heritage, clan MacLeod connections"]',  -- example_inputs (JSON)
