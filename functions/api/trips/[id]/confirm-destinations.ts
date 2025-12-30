@@ -20,10 +20,12 @@ export async function onRequestPost(context: { request: Request; env: Env; param
   const phaseGate = createPhaseGate(db, logger);
 
   const tripId = context.params.id;
+  logger.info(`=== CONFIRM DESTINATIONS START: trip ${tripId} ===`);
 
   try {
     // Parse request body
     const body = await context.request.json() as ConfirmDestinationsRequest;
+    logger.info(`Request body: ${JSON.stringify(body)}`);
 
     if (!body.confirmed_destinations || body.confirmed_destinations.length === 0) {
       return new Response(
@@ -130,9 +132,17 @@ export async function onRequestPost(context: { request: Request; env: Env; param
       }
     );
   } catch (error) {
-    logger.error(`Failed to confirm destinations for trip ${tripId}: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    logger.error(`Failed to confirm destinations for trip ${tripId}: ${errorMessage}\n${errorStack}`);
+
+    // Log to telemetry for debugging
+    await logger.logTelemetry(db, tripId, 'confirm_error', {
+      details: { error: errorMessage },
+    });
+
     return new Response(
-      JSON.stringify({ error: 'Failed to confirm destinations' }),
+      JSON.stringify({ error: `Failed to confirm destinations: ${errorMessage}` }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },

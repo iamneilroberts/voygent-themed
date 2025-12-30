@@ -23,91 +23,143 @@
   gap: var(--spacing-md);
 }
 
-.destinations-panel,
-.preferences-panel {
+/* Telemetry Panel */
+.telemetry-panel {
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--border-radius);
-  padding: var(--spacing-md);
   box-shadow: var(--shadow);
+  font-size: 0.85rem;
 }
 
-.destinations-panel h3,
-.preferences-panel h3 {
-  font-size: 1.1rem;
-  margin-bottom: var(--spacing-sm);
-  color: var(--text-primary);
+.telemetry-panel summary {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-weight: 600;
+  cursor: pointer;
+  background-color: #1e293b;
+  color: #94a3b8;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
 
-/* Destinations List */
-.destinations-list {
-  margin-bottom: var(--spacing-md);
+.telemetry-panel[open] summary {
+  border-bottom: 1px solid var(--border);
 }
 
-.destination-item {
+.telemetry-list {
+  max-height: 300px;
+  overflow-y: auto;
   padding: var(--spacing-sm);
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius);
-  margin-bottom: var(--spacing-sm);
+  background-color: #0f172a;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.telemetry-entry {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #1e293b;
+  color: #94a3b8;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.telemetry-entry:last-child {
+  border-bottom: none;
+}
+
+.telemetry-entry .time {
+  color: #64748b;
+  min-width: 70px;
+}
+
+.telemetry-entry .event {
+  color: #22d3ee;
+  font-weight: 500;
+}
+
+.telemetry-entry .details {
+  color: #a3e635;
+  word-break: break-all;
+}
+
+.telemetry-entry.telemetry-error .event {
+  color: #f87171;
+}
+
+.telemetry-entry.telemetry-api .event {
+  color: #a78bfa;
+}
+
+.telemetry-entry.telemetry-status .event {
+  color: #fbbf24;
+}
+
+.telemetry-entry.telemetry-search_queries .event,
+.telemetry-entry.telemetry-search_results .event {
+  color: #60a5fa;
+}
+
+.telemetry-entry.telemetry-context_extraction .event {
+  color: #c084fc;
+}
+
+.telemetry-entry.telemetry-chat_response .event {
+  color: #4ade80;
+}
+
+.telemetry-details-expanded {
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  margin-top: 0.25rem;
+  padding-left: 70px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.telemetry-details-expanded .detail-key {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.telemetry-summary {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: #1e293b;
+  display: flex;
+  gap: var(--spacing-md);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+.cost-display {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cost-display .label {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.cost-display .value {
+  color: #22d3ee;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* Confirm Container */
+.confirm-container {
+  padding: var(--spacing-md);
   background-color: var(--background);
+  border-top: 1px solid var(--border);
+  text-align: center;
 }
 
-.destination-item:last-child {
-  margin-bottom: 0;
-}
-
-.destination-item h4 {
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
-  color: var(--text-primary);
-}
-
-.destination-item .context {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.destination-item .rationale {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.destination-item .days {
-  font-size: 0.85rem;
-  color: var(--primary-color);
-  font-weight: 500;
-}
-
-/* Preferences Form */
-.form-group {
+.confirm-container .confirm-prompt {
   margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
 }
 
-.form-group label {
-  display: block;
-  font-size: 0.9rem;
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-  color: var(--text-primary);
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 0.5rem;
-  font-size: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--border-radius);
-  background-color: var(--surface);
-  color: var(--text-primary);
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: var(--primary-color);
+.confirm-container .btn {
+  min-width: 200px;
 }
 
 /* Chat Main */

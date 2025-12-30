@@ -169,6 +169,14 @@ const IntakeForm = {
     const requiredFields = this.parseFields(template.required_fields);
     this.buildFieldsGrid('requiredFieldsGrid', requiredFields, true);
 
+    // Show/hide required section based on fields
+    const requiredSection = document.getElementById('requiredFields');
+    if (requiredFields.length === 0) {
+      requiredSection.classList.add('hidden');
+    } else {
+      requiredSection.classList.remove('hidden');
+    }
+
     // Build optional fields
     const optionalFields = this.parseFields(template.optional_fields);
     this.buildFieldsGrid('optionalFieldsGrid', optionalFields, false);
@@ -202,12 +210,15 @@ const IntakeForm = {
   },
 
   /**
-   * Parse JSON fields array
+   * Parse fields array (handles both JSON string and already-parsed array)
    */
-  parseFields(fieldsJson) {
-    if (!fieldsJson) return [];
+  parseFields(fields) {
+    if (!fields) return [];
+    // If already an array, return it
+    if (Array.isArray(fields)) return fields;
+    // If string, try to parse as JSON
     try {
-      return JSON.parse(fieldsJson);
+      return JSON.parse(fields);
     } catch {
       return [];
     }

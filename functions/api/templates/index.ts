@@ -15,13 +15,16 @@ export async function onRequestGet(context: { env: Env }): Promise<Response> {
 
     const templates = await db.getFeaturedTemplates();
 
-    // Return minimal template info for homepage cards
+    // Return template info for homepage cards and intake form
     const templateCards = templates.map((template) => ({
       id: template.id,
       name: template.name,
       description: template.description,
       icon: template.icon,
       search_placeholder: template.search_placeholder,
+      search_help_text: template.search_help_text,
+      required_fields: template.required_fields,
+      optional_fields: template.optional_fields,
     }));
 
     return new Response(JSON.stringify({ templates: templateCards }), {

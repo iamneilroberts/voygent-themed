@@ -48,6 +48,16 @@ export async function onRequestGet(context: { env: Env; params: { id: string } }
       ? JSON.parse(trip.preferences_json)
       : undefined;
 
+    // Parse telemetry logs
+    let telemetryLogs = [];
+    if (trip.telemetry_logs) {
+      try {
+        telemetryLogs = JSON.parse(trip.telemetry_logs);
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
     // Build response
     const response = {
       trip_id: trip.id,
@@ -69,6 +79,11 @@ export async function onRequestGet(context: { env: Env; params: { id: string } }
       options: options,
       selected_option_index: trip.selected_option_index,
       total_cost_usd: trip.total_cost_usd,
+
+      // Telemetry (for debug panel)
+      ai_cost_usd: trip.ai_cost_usd,
+      api_cost_usd: trip.api_cost_usd,
+      telemetry_logs: telemetryLogs,
 
       created_at: trip.created_at,
       updated_at: trip.updated_at,

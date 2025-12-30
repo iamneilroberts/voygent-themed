@@ -58,8 +58,14 @@ export class ResearchService {
     await this.logger.logUserProgress(this.db, tripId, 'Researching destinations...', 10);
 
     try {
-      // Step 1: Extract context from user message and preferences
-      const context = this.templateEngine.extractContext(userMessage, preferences);
+      // Step 1: Extract context using AI for template-specific placeholders
+      const context = await this.extractContextWithAI(
+        userMessage,
+        template,
+        preferences,
+        costTracker,
+        tripId
+      );
       this.logger.debug(`Extracted context: ${JSON.stringify(context)}`);
 
       // Step 2: Build research queries from template
@@ -70,11 +76,27 @@ export class ResearchService {
         throw new Error('No research queries configured in template');
       }
 
+      // Log the actual queries being executed
+      await this.logger.logTelemetry(this.db, tripId, 'search_queries', {
+        details: {
+          queries: queries,
+          extracted_context: context,
+        },
+      });
+
       await this.logger.logUserProgress(this.db, tripId, 'Searching the web for destinations...', 30);
 
       // Step 3: Perform web searches
       const searchResults = await this.searchClient.searchMultiple(queries, 5, costTracker);
       this.logger.info(`Completed ${searchResults.length} searches`);
+
+      // Log search results summary
+      await this.logger.logTelemetry(this.db, tripId, 'search_results', {
+        details: {
+          total_results: searchResults.reduce((sum, r) => sum + r.results.length, 0),
+          by_query: searchResults.map(r => ({ query: r.query, count: r.results.length })),
+        },
+      });
 
       await this.logger.logUserProgress(this.db, tripId, 'Analyzing results...', 50);
 
@@ -152,33 +174,52 @@ export class ResearchService {
       searchContext += '\n';
     });
 
+    // Build geographic constraint if region was extracted
+    let regionConstraint = '';
+    if (context.region) {
+      regionConstraint = `\nCRITICAL GEOGRAPHIC CONSTRAINT: All destinations MUST be located in or near "${context.region}". Do NOT suggest locations in other countries or regions. The user specifically wants to travel to ${context.region}.\n`;
+    }
+
+    // Build user context summary
+    const userContextSummary = Object.entries(context)
+      .filter(([key, value]) => value && !['departure_airport', 'luxury_level', 'activity_level'].includes(key))
+      .map(([key, value]) => `- ${key}: ${value}`)
+      .join('\n');
+
     // Build full prompt
     const fullPrompt = `${criteriaPrompt}
-
+${regionConstraint}
 ${synthesisPrompt}
+
+User's request context:
+${userContextSummary}
 
 ${searchContext}
 
 IMPORTANT: Your response must be ONLY a valid JSON array of destinations. No additional text or explanation.
+${context.region ? `All destinations MUST be in ${context.region} - do not suggest US or other country locations.` : ''}
+
 Format:
 [
   {
-    "name": "Destination Name",
-    "geographic_context": "Context (e.g., 'Primary origin', 'Cultural center')",
+    "name": "City/Town Name",
+    "geographic_context": "Region/Country (e.g., 'County Cork, Ireland')",
     "key_sites": ["Site 1", "Site 2", "Site 3"],
-    "travel_logistics_note": "Optional logistics info",
-    "rationale": "Why this destination is relevant",
+    "travel_logistics_note": "Nearest airport, travel tips",
+    "rationale": "Why this destination is relevant to the user's request",
     "estimated_days": 3
   }
 ]
 
-Generate 2-4 destinations.`;
+Generate 2-4 destinations that match the user's request.`;
+
+    this.logger.info(`Synthesis prompt context: ${JSON.stringify(context)}`);
 
     // Call AI
     const aiResponse = await this.aiProvider.generate(
       {
         prompt: fullPrompt,
-        systemPrompt: 'You are a heritage travel research assistant. Respond ONLY with valid JSON arrays, no additional text.',
+        systemPrompt: `You are a ${template.name} travel research assistant. Respond ONLY with valid JSON arrays, no additional text. ${context.region ? `Focus exclusively on destinations in ${context.region}.` : ''}`,
         maxTokens: 2000,
         temperature: 0.7,
       },
@@ -190,6 +231,11 @@ Generate 2-4 destinations.`;
       model: aiResponse.model,
       tokens: aiResponse.totalTokens,
       cost: aiResponse.cost,
+      details: {
+        region: context.region || 'not specified',
+        surname: context.surname || 'not specified',
+        search_results_count: searchResults.reduce((sum, r) => sum + r.results.length, 0),
+      },
     });
 
     // Parse JSON response
@@ -286,19 +332,26 @@ Generate a friendly, conversational message presenting these destinations to the
       return response.results.map((r) => `- ${r.title}: ${r.snippet}`).join('\n');
     }).join('\n\n');
 
-    const prompt = `Based on the following web search results about ${context.topic || 'travel destinations'}, write a brief 2-3 paragraph summary of key findings that would help a traveler plan their trip.
+    // Get theme name for context
+    const themeName = _template.name || 'travel';
+
+    const prompt = `You are a ${themeName} research specialist. Based on the following web search results about "${context.topic || context.surname || context.destination || 'this topic'}", write a comprehensive 3-4 paragraph summary.
+
+User's query: "${context.topic || context.surname || 'travel planning'}"
+Theme: ${themeName}
 
 Search queries used: ${queries.join(', ')}
 
 Key findings from research:
 ${searchContext}
 
-Write a friendly, informative summary highlighting:
-1. The most interesting discoveries
-2. Key locations or experiences mentioned
-3. Any practical travel tips found
+Write a detailed, informative summary that:
+1. **Background/History**: Provide relevant historical or cultural context about the topic (e.g., for heritage trips: surname origins, clan history, notable ancestors, historical significance)
+2. **Geographic Relevance**: List the most relevant regions, cities, or areas connected to this topic with specific place names
+3. **Key Attractions**: Mention specific sites, museums, archives, or experiences that would be valuable to visit
+4. **Practical Insights**: Include any useful travel tips, best times to visit, or local knowledge
 
-Keep it concise and engaging.`;
+Be specific with place names and facts. This summary helps the traveler understand what they'll discover before seeing destination recommendations.`;
 
     const aiResponse = await this.aiProvider.generate(
       {
@@ -321,6 +374,87 @@ Keep it concise and engaging.`;
       queries,
       sources,
       summary: aiResponse.text,
+    };
+  }
+
+  /**
+   * Extract context from user message using AI for template-specific placeholders
+   */
+  private async extractContextWithAI(
+    userMessage: string,
+    template: TripTemplate,
+    preferences: TripPreferences | undefined,
+    costTracker: CostTracker,
+    tripId: string
+  ): Promise<any> {
+    // Start with basic regex extraction for backward compatibility
+    const baseContext = this.templateEngine.extractContext(userMessage, preferences);
+
+    // Get template-specific placeholders
+    const placeholders = this.templateEngine.extractPlaceholders(template);
+
+    if (placeholders.length === 0) {
+      // No template-specific placeholders, use basic extraction
+      return baseContext;
+    }
+
+    this.logger.info(`Extracting ${placeholders.length} placeholders with AI: ${placeholders.join(', ')}`);
+
+    // Build extraction prompt
+    const extractionPrompt = this.templateEngine.buildContextExtractionPrompt(
+      template,
+      placeholders,
+      userMessage
+    );
+
+    try {
+      // Call AI to extract context
+      const aiResponse = await this.aiProvider.generate(
+        {
+          prompt: extractionPrompt,
+          systemPrompt: 'You are a precise data extraction assistant. Extract only what is explicitly mentioned. Respond with valid JSON only.',
+          maxTokens: 200,
+          temperature: 0.1, // Low temperature for consistent extraction
+        },
+        costTracker
+      );
+
+      await this.logger.logTelemetry(this.db, tripId, 'context_extraction', {
+        provider: aiResponse.provider,
+        model: aiResponse.model,
+        tokens: aiResponse.totalTokens,
+        cost: aiResponse.cost,
+        details: { placeholders: placeholders.join(', ') },
+      });
+
+      // Parse AI response
+      const jsonMatch = aiResponse.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const extracted = JSON.parse(jsonMatch[0]);
+
+        // Merge AI-extracted values with base context (AI values take precedence)
+        const mergedContext = { ...baseContext };
+        for (const [key, value] of Object.entries(extracted)) {
+          if (value !== null && value !== 'null' && value !== '') {
+            mergedContext[key] = value;
+          }
+        }
+
+        // Also add the raw user message as 'topic' for fallback
+        mergedContext.topic = userMessage;
+
+        this.logger.info(`AI extracted context: ${JSON.stringify(mergedContext)}`);
+        return mergedContext;
+      }
+    } catch (error) {
+      this.logger.error(`AI context extraction failed: ${error}`);
+      // Fall back to basic extraction + topic
+    }
+
+    // Fallback: use basic extraction plus raw message as topic
+    return {
+      ...baseContext,
+      topic: userMessage,
     };
   }
 

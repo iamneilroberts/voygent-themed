@@ -156,42 +156,66 @@ Production database: `voygent-themed` (ID: 62077781-9458-4206-a5c6-f38dc419e599)
 
 ## Current Status (2024-12-29)
 
-### Recently Completed
-1. **Multiple Trip Templates** - Added 6 themed templates:
-   - Heritage & Ancestry (🌳)
-   - TV & Movie Locations (🎬)
-   - Historical Sites (⚔️)
-   - Culinary Experiences (🍽️)
-   - Adventure & Outdoor (🏔️)
-   - Romance & Honeymoon (💑)
+### Recently Completed (This Session)
 
-2. **Enhanced Intake Form** - Modal-based form with:
-   - Theme-specific main query textarea
-   - Dynamic required/optional fields based on template configuration
-   - Fields: duration, departure_airport, travelers, luxury_level, activity_level, departure_date, dietary_restrictions, occasion, interests, fitness_level, experience_level
-   - Files: `public/index.html`, `public/js/intake-form.js`, `public/js/main.js`
+1. **AI-Powered Context Extraction** - Template placeholders are now extracted using AI:
+   - `functions/lib/template-engine.ts`: Added `extractPlaceholders()` and `buildContextExtractionPrompt()`
+   - `functions/services/research-service.ts`: Added `extractContextWithAI()` method
+   - Each template's placeholders (e.g., `{surname}`, `{region}`, `{show_name}`) are identified and AI extracts values from user input
+   - Logged as `context_extraction` telemetry event
 
-3. **Research Summary Feature** - Shows AI research findings before destination recommendations:
-   - Migration: `db/migrations/0003_add_research_summary.sql`
-   - Backend: `functions/services/research-service.ts` generates summary from web searches
-   - API: `functions/api/trips/[id]/index.ts` returns `research_summary` field
-   - Frontend: `public/js/chat.js` displays summary with sources before destinations
-   - Styled with distinct visual treatment in `public/css/chat.css`
+2. **Geographic Region Enforcement** - Destination synthesis now respects user's specified region:
+   - Added `CRITICAL GEOGRAPHIC CONSTRAINT` to synthesis prompt when region is extracted
+   - Prevents AI from suggesting US locations when user asks about Ireland, etc.
+   - System prompt dynamically includes region focus
+
+3. **Debug Telemetry Panel** - Replaced sidebar destinations panel with telemetry:
+   - `public/chat.html`: New telemetry panel structure
+   - `public/js/chat.js`: Functions `displayTelemetryLogs()`, `formatTelemetryDetails()`, `addTelemetryEntry()`
+   - `public/css/chat.css`: Color-coded telemetry entries by event type
+   - Shows: AI calls, search queries, context extraction, costs, tokens
+   - Events: `search_queries`, `search_results`, `context_extraction`, `destination_synthesis`, `chat_response`
+
+4. **Clickable Source Links** - Research summary sources are now hyperlinks:
+   - `public/js/chat.js`: Updated `displayResearchSummary()` to use markdown links
+   - `formatMessageContent()` now converts `[text](url)` to HTML `<a>` tags
+
+5. **Intake Form Fields Fix** - Trip Details section now populates correctly:
+   - `functions/api/templates/index.ts`: Added `required_fields`, `optional_fields`, `search_help_text` to response
+   - `public/js/intake-form.js`: Fixed `parseFields()` to handle both arrays and JSON strings
+   - Shows: Trip Duration, Departure Airport, and optional fields (travelers, budget, activity level, dates)
+
+6. **Enhanced Error Logging** - Better debugging for confirm destinations:
+   - `functions/api/trips/[id]/confirm-destinations.ts`: Detailed error messages with stack traces
+   - Logs to telemetry on errors
+
+7. **Chat Telemetry** - All AI calls in chat handler now log telemetry:
+   - `functions/api/trips/[id]/chat.ts`: Added telemetry for destination questions and general chat
 
 ### Deployment
-- **Live at**: https://voygent.app (CNAME → voygent-v3.pages.dev)
-- **Deploy command**: `CLOUDFLARE_API_TOKEN=<pages-token> npx wrangler pages deploy public`
-- Database migrations applied to both local and production
+- **Preview URL**: https://002-end-to-end.voygent-v3.pages.dev (branch preview)
+- **Production**: https://voygent.app (main branch - needs merge)
+- **Deploy command**: `CLOUDFLARE_API_TOKEN=tBembNqogoxi6cIyJxQB82n4nSKlXhFu4cccmIOF npx wrangler pages deploy public --branch=002-end-to-end`
 
-### Next Tasks
-1. **Test full user flow** - Create a trip through the new intake form, verify research summary displays correctly
-2. **Geographic context improvements** - Currently relies on AI interpretation; consider adding explicit region/country field to intake form
-3. **Chat history persistence** - Ensure chat messages are properly stored and restored on page reload
-4. **Preferences panel sync** - Sync intake form preferences to the sidebar preferences panel in chat view
-5. **Phase 2 trip building** - Test Amadeus/Viator integration after destination confirmation
-6. **Error handling** - Add user-friendly error messages for API failures
-7. **Mobile responsiveness** - Test and refine mobile layout for intake form modal
+### Known Working
+- Intake form modal with dynamic fields
+- AI context extraction for template placeholders
+- Region-constrained destination synthesis (Ireland, not US counties)
+- Telemetry panel showing API calls and costs
+- Clickable source links in research summary
+
+### Next Tasks (Priority Order)
+1. **Test "Build Trip" button** - Currently fails with error, needs debugging
+   - Error happens in `confirm-destinations.ts` - check validation logic
+   - May be mismatch between `research_destinations` names and `confirmed_destinations`
+2. **End-to-end flow test** - Complete a full trip from intake to destination confirmation
+3. **Phase 2 trip building** - Test Amadeus/Viator integration after destination confirmation
+4. **Merge to main** - Once stable, merge 002-end-to-end branch to main for production
 
 ### Known Issues
+- **Build Trip Error**: "Failed to confirm destinations" - needs investigation
+  - Validation at line 62-77 in confirm-destinations.ts checks destination names match
+  - Frontend sends `research_destinations.map(d => d.name)` as confirmed destinations
+  - Better error logging added - check telemetry for `confirm_error` event
 - Duplicate Heritage template exists (heritage-001 and heritage-ancestry-001) - clean up in seeds
-- Cloudflare API token for Pages needs specific permissions (use CLOUDFLARE_PAGES_API_TOKEN)
+- Production (main branch) doesn't have latest changes - need to merge 002-end-to-end

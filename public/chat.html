@@ -22,52 +22,24 @@
   <main>
     <div class="container">
       <div class="chat-layout">
-        <!-- Sidebar: Destinations & Preferences -->
+        <!-- Sidebar: Debug Telemetry (collapsible) -->
         <aside class="sidebar">
-          <section class="destinations-panel" id="destinationsPanel">
-            <h3>Research Destinations</h3>
-            <div class="destinations-list" id="destinationsList">
-              <p class="empty-state">Researching destinations...</p>
+          <details class="telemetry-panel" id="telemetryPanel" open>
+            <summary>Debug Telemetry</summary>
+            <div class="telemetry-list" id="telemetryList">
+              <p class="empty-state">No API calls yet...</p>
             </div>
-            <button
-              class="btn btn-primary"
-              id="confirmBtn"
-              style="display: none;"
-            >
-              Confirm Destinations
-            </button>
-          </section>
-
-          <section class="preferences-panel" id="preferencesPanel">
-            <h3>Trip Preferences</h3>
-            <form id="preferencesForm">
-              <div class="form-group">
-                <label for="duration">Duration</label>
-                <input type="text" id="duration" placeholder="e.g., 7-10 days">
+            <div class="telemetry-summary" id="telemetrySummary">
+              <div class="cost-display">
+                <span class="label">AI Cost:</span>
+                <span class="value" id="aiCostDisplay">$0.00</span>
               </div>
-
-              <div class="form-group">
-                <label for="departure_airport">Departure Airport</label>
-                <input type="text" id="departure_airport" placeholder="e.g., JFK">
+              <div class="cost-display">
+                <span class="label">API Cost:</span>
+                <span class="value" id="apiCostDisplay">$0.00</span>
               </div>
-
-              <div class="form-group">
-                <label for="travelers_adults">Adults</label>
-                <input type="number" id="travelers_adults" min="1" value="2">
-              </div>
-
-              <div class="form-group">
-                <label for="luxury_level">Luxury Level</label>
-                <select id="luxury_level">
-                  <option value="Budget">Budget</option>
-                  <option value="Comfort" selected>Comfort</option>
-                  <option value="Luxury">Luxury</option>
-                </select>
-              </div>
-
-              <button type="submit" class="btn btn-secondary">Update Preferences</button>
-            </form>
-          </section>
+            </div>
+          </details>
         </aside>
 
         <!-- Main: Chat Interface -->
@@ -82,6 +54,12 @@
             <div class="trip-options-grid" id="tripOptionsGrid">
               <!-- Options will be appended here -->
             </div>
+          </div>
+
+          <!-- Confirm Destinations Button (shown when awaiting_confirmation) -->
+          <div class="confirm-container" id="confirmContainer" style="display: none;">
+            <p class="confirm-prompt">Ready to proceed with these destinations?</p>
+            <button class="btn btn-primary" id="confirmBtn">Confirm & Build Trip</button>
           </div>
 
           <div class="chat-input-container">

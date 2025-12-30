@@ -146,6 +146,15 @@ Provide a helpful, friendly response to their question about these destinations.
           costTracker
         );
 
+        // Log telemetry for this AI call
+        await logger.logTelemetry(db, tripId, 'chat_response', {
+          provider: response.provider,
+          model: response.model,
+          tokens: response.totalTokens,
+          cost: response.cost,
+          details: { context: 'destination_question', message_preview: body.message.substring(0, 50) },
+        });
+
         aiResponse = response.text;
       }
     } else {
@@ -181,6 +190,15 @@ Provide a helpful, friendly response. If the user is ready to see destination re
         },
         costTracker
       );
+
+      // Log telemetry for this AI call
+      await logger.logTelemetry(db, tripId, 'chat_response', {
+        provider: response.provider,
+        model: response.model,
+        tokens: response.totalTokens,
+        cost: response.cost,
+        details: { context: 'general_chat', message_preview: body.message.substring(0, 50) },
+      });
 
       aiResponse = response.text;
     }

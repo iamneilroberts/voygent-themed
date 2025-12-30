@@ -1,6 +1,6 @@
 /**
  * VoyGent V3 - Chat Interface
- * Handles chat messages, destinations, and trip state
+ * Handles chat messages, telemetry, and trip state
  */
 
 let tripId = null;
@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize UI
   initializeChatForm();
-  initializePreferencesForm();
   initializeConfirmButton();
 
   // Load initial trip state
@@ -57,6 +56,9 @@ function initializeChatForm() {
       // Clear input
       chatInput.value = '';
 
+      // Log to telemetry
+      addTelemetryEntry('chat', 'Sending message...', { message: message.substring(0, 50) });
+
       // Send message to API
       const response = await apiClient.sendChatMessage(tripId, message);
 
@@ -68,34 +70,13 @@ function initializeChatForm() {
     } catch (error) {
       console.error('Failed to send message:', error);
       addMessageToChat('assistant', 'Sorry, I encountered an error. Please try again.');
+      addTelemetryEntry('error', 'Chat failed', { error: error.message });
     } finally {
       // Re-enable input
       chatInput.disabled = false;
       sendBtn.disabled = false;
       chatInput.focus();
     }
-  });
-}
-
-/**
- * Initialize preferences form
- */
-function initializePreferencesForm() {
-  const preferencesForm = document.getElementById('preferencesForm');
-
-  preferencesForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const preferences = {
-      duration: document.getElementById('duration').value,
-      departure_airport: document.getElementById('departure_airport').value,
-      travelers_adults: parseInt(document.getElementById('travelers_adults').value),
-      luxury_level: document.getElementById('luxury_level').value,
-    };
-
-    // TODO: Update preferences via API
-    console.log('Preferences updated:', preferences);
-    alert('Preferences updated! These will be used when building your trip.');
   });
 }
 
@@ -113,30 +94,30 @@ function initializeConfirmButton() {
 
     const confirmedDestinations = currentTrip.research_destinations.map(d => d.name);
 
-    // Get current preferences
-    const preferences = {
-      duration: document.getElementById('duration').value || undefined,
-      departure_airport: document.getElementById('departure_airport').value || undefined,
-      travelers_adults: parseInt(document.getElementById('travelers_adults').value) || 2,
-      luxury_level: document.getElementById('luxury_level').value || 'Comfort',
-    };
-
     try {
       confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Confirming...';
+      confirmBtn.textContent = 'Building trip...';
 
-      await apiClient.confirmDestinations(tripId, confirmedDestinations, preferences);
+      addTelemetryEntry('api', 'Confirming destinations', {
+        destinations: confirmedDestinations
+      });
+
+      await apiClient.confirmDestinations(tripId, confirmedDestinations, null);
+
+      // Hide confirm container
+      document.getElementById('confirmContainer').style.display = 'none';
 
       // Reload trip state
       await loadTripState();
 
-      addMessageToChat('assistant', 'Destinations confirmed! Building your trip options now...');
+      addMessageToChat('assistant', 'Destinations confirmed! Now building your personalized trip options. This may take a few minutes...');
     } catch (error) {
       console.error('Failed to confirm destinations:', error);
       alert('Failed to confirm destinations. Please try again.');
+      addTelemetryEntry('error', 'Confirm failed', { error: error.message });
     } finally {
       confirmBtn.disabled = false;
-      confirmBtn.textContent = 'Confirm Destinations';
+      confirmBtn.textContent = 'Confirm & Build Trip';
     }
   });
 }
@@ -147,6 +128,9 @@ function initializeConfirmButton() {
 async function loadTripState() {
   try {
     const trip = await apiClient.getTrip(tripId);
+
+    // Check if state changed
+    const stateChanged = !currentTrip || currentTrip.status !== trip.status;
     currentTrip = trip;
 
     // Update template name
@@ -156,17 +140,25 @@ async function loadTripState() {
     // Update progress
     updateProgress(trip.progress_percent || 0, trip.progress_message || '');
 
-    // Update destinations
-    updateDestinations(trip.research_destinations, trip.destinations_confirmed);
+    // Update telemetry panel
+    updateTelemetryPanel(trip);
 
-    // Update chat history
+    // Handle different states
+    if (trip.status === 'researching') {
+      addTelemetryEntry('status', `Status: ${trip.status}`, {
+        progress: trip.progress_percent
+      });
+    }
+
     if (trip.status === 'awaiting_confirmation' && !trip.destinations_confirmed) {
-      // Show research summary first
+      // Show research summary first (if not already shown)
       if (trip.research_summary) {
         displayResearchSummary(trip.research_summary);
       }
       // Then show destinations
       updateChatWithDestinations(trip.research_destinations);
+      // Show confirm button
+      document.getElementById('confirmContainer').style.display = 'block';
     }
 
     // Update trip options
@@ -190,38 +182,138 @@ function updateProgress(percent, message) {
 }
 
 /**
- * Update destinations panel
+ * Update telemetry panel with trip data
  */
-function updateDestinations(destinations, confirmed) {
-  const destinationsList = document.getElementById('destinationsList');
-  const confirmBtn = document.getElementById('confirmBtn');
+function updateTelemetryPanel(trip) {
+  // Update cost displays
+  document.getElementById('aiCostDisplay').textContent =
+    `$${(trip.ai_cost_usd || 0).toFixed(4)}`;
+  document.getElementById('apiCostDisplay').textContent =
+    `$${(trip.api_cost_usd || 0).toFixed(4)}`;
 
-  if (!destinations || destinations.length === 0) {
-    destinationsList.innerHTML = '<p class="empty-state">Researching destinations...</p>';
-    confirmBtn.style.display = 'none';
+  // If there are telemetry logs, display them
+  if (trip.telemetry_logs) {
+    try {
+      const logs = JSON.parse(trip.telemetry_logs);
+      displayTelemetryLogs(logs);
+    } catch (e) {
+      // Logs might already be an object
+      if (Array.isArray(trip.telemetry_logs)) {
+        displayTelemetryLogs(trip.telemetry_logs);
+      }
+    }
+  }
+}
+
+/**
+ * Format telemetry details object for display
+ */
+function formatTelemetryDetails(details) {
+  if (!details || typeof details !== 'object') return '';
+
+  const parts = [];
+  for (const [key, value] of Object.entries(details)) {
+    if (value === null || value === undefined) continue;
+
+    let displayValue;
+    if (Array.isArray(value)) {
+      // For arrays, show first few items
+      if (value.length <= 3) {
+        displayValue = value.join(', ');
+      } else {
+        displayValue = value.slice(0, 3).join(', ') + ` (+${value.length - 3} more)`;
+      }
+    } else if (typeof value === 'object') {
+      // For nested objects, show compact JSON
+      displayValue = JSON.stringify(value).substring(0, 100);
+      if (JSON.stringify(value).length > 100) displayValue += '...';
+    } else {
+      displayValue = String(value);
+    }
+
+    parts.push(`<span class="detail-key">${key}:</span> ${displayValue}`);
+  }
+
+  return parts.join(' | ');
+}
+
+/**
+ * Display telemetry logs
+ */
+function displayTelemetryLogs(logs) {
+  const telemetryList = document.getElementById('telemetryList');
+
+  if (!logs || logs.length === 0) {
     return;
   }
 
-  destinationsList.innerHTML = '';
+  // Clear placeholder
+  if (telemetryList.querySelector('.empty-state')) {
+    telemetryList.innerHTML = '';
+  }
 
-  destinations.forEach((dest) => {
-    const item = document.createElement('div');
-    item.className = 'destination-item';
-    item.innerHTML = `
-      <h4>${dest.name}</h4>
-      <div class="context">${dest.geographic_context}</div>
-      <div class="rationale">${dest.rationale}</div>
-      <div class="days">~${dest.estimated_days} days</div>
+  // Check what's already displayed
+  const existingCount = telemetryList.querySelectorAll('.telemetry-entry').length;
+
+  // Add new entries
+  logs.slice(existingCount).forEach((log) => {
+    const entry = document.createElement('div');
+    entry.className = `telemetry-entry telemetry-${log.event}`;
+
+    const time = new Date(log.timestamp).toLocaleTimeString();
+    const provider = log.provider || '';
+    const model = log.model ? ` (${log.model})` : '';
+    const tokens = log.tokens ? ` - ${log.tokens} tokens` : '';
+    const cost = log.cost ? ` - $${log.cost.toFixed(4)}` : '';
+    const duration = log.duration_ms ? ` - ${log.duration_ms}ms` : '';
+
+    // Format details object if present
+    let detailsStr = '';
+    if (log.details) {
+      detailsStr = formatTelemetryDetails(log.details);
+    }
+
+    entry.innerHTML = `
+      <span class="time">${time}</span>
+      <span class="event">${log.event}</span>
+      <span class="details">${provider}${model}${tokens}${cost}${duration}</span>
+      ${detailsStr ? `<div class="telemetry-details-expanded">${detailsStr}</div>` : ''}
     `;
-    destinationsList.appendChild(item);
+
+    telemetryList.appendChild(entry);
   });
 
-  // Show/hide confirm button
-  if (confirmed) {
-    confirmBtn.style.display = 'none';
-  } else {
-    confirmBtn.style.display = 'block';
+  // Scroll to bottom
+  telemetryList.scrollTop = telemetryList.scrollHeight;
+}
+
+/**
+ * Add manual telemetry entry (for client-side events)
+ */
+function addTelemetryEntry(type, event, details = {}) {
+  const telemetryList = document.getElementById('telemetryList');
+
+  // Clear placeholder if present
+  if (telemetryList.querySelector('.empty-state')) {
+    telemetryList.innerHTML = '';
   }
+
+  const entry = document.createElement('div');
+  entry.className = `telemetry-entry telemetry-${type}`;
+
+  const time = new Date().toLocaleTimeString();
+  const detailsStr = Object.entries(details)
+    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .join(', ');
+
+  entry.innerHTML = `
+    <span class="time">${time}</span>
+    <span class="event">${event}</span>
+    <span class="details">${detailsStr}</span>
+  `;
+
+  telemetryList.appendChild(entry);
+  telemetryList.scrollTop = telemetryList.scrollHeight;
 }
 
 /**
@@ -238,19 +330,25 @@ function displayResearchSummary(researchSummary) {
   const message = document.createElement('div');
   message.className = 'message message-assistant research-summary';
 
-  let content = '**What I Found:**\n\n';
+  let content = '**What I Discovered:**\n\n';
   content += researchSummary.summary + '\n\n';
 
-  // Show sources
+  // Show sources as clickable links
   if (researchSummary.sources && researchSummary.sources.length > 0) {
     content += '**Sources consulted:**\n';
     researchSummary.sources.slice(0, 5).forEach((source) => {
-      content += `- ${source.title}\n`;
+      content += `- [${source.title}](${source.url})\n`;
     });
   }
 
   message.innerHTML = formatMessageContent(content);
   chatMessages.appendChild(message);
+
+  // Log to telemetry
+  addTelemetryEntry('research', 'Research summary displayed', {
+    queries: researchSummary.queries?.length || 0,
+    sources: researchSummary.sources?.length || 0
+  });
 
   scrollChatToBottom();
 }
@@ -269,16 +367,23 @@ function updateChatWithDestinations(destinations) {
   const message = document.createElement('div');
   message.className = 'message message-assistant destinations-intro';
 
-  let content = 'Based on your interests, I recommend these destinations:\n\n';
+  let content = '**Recommended Destinations:**\n\n';
   destinations.forEach((dest, index) => {
-    content += `${index + 1}. **${dest.name}** (${dest.geographic_context})\n`;
-    content += `   ${dest.rationale}\n`;
-    content += `   Estimated duration: ${dest.estimated_days} days\n\n`;
+    content += `**${index + 1}. ${dest.name}** (${dest.geographic_context})\n`;
+    content += `${dest.rationale}\n`;
+    if (dest.key_sites && dest.key_sites.length > 0) {
+      content += `Key sites: ${dest.key_sites.join(', ')}\n`;
+    }
+    content += `Estimated duration: ${dest.estimated_days} days\n\n`;
   });
   content += 'Would you like to proceed with these destinations, or would you like me to make any changes?';
 
   message.innerHTML = formatMessageContent(content);
   chatMessages.appendChild(message);
+
+  addTelemetryEntry('destinations', 'Destinations displayed', {
+    count: destinations.length
+  });
 
   scrollChatToBottom();
 }
@@ -302,8 +407,10 @@ function addMessageToChat(role, content) {
  * Format message content (handle markdown-like formatting)
  */
 function formatMessageContent(content) {
-  // Basic formatting: **bold**, \n to <br>
+  // Convert markdown links [text](url) to HTML links
+  // Then **bold**, then \n to <br>
   return content
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
 }
@@ -338,6 +445,10 @@ function updateTripOptions(options, selectedOptionIndex) {
   options.forEach((option) => {
     const card = createTripOptionCard(option, selectedOptionIndex);
     tripOptionsGrid.appendChild(card);
+  });
+
+  addTelemetryEntry('options', 'Trip options displayed', {
+    count: options.length
   });
 }
 
@@ -405,6 +516,10 @@ function createTripOptionCard(option, selectedOptionIndex) {
     try {
       selectBtn.disabled = true;
       selectBtn.textContent = 'Selecting...';
+
+      addTelemetryEntry('api', 'Selecting option', {
+        option: option.option_index
+      });
 
       await apiClient.selectTripOption(tripId, option.option_index);
 
