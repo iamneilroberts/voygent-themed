@@ -79,6 +79,76 @@
     </div>
   </main>
 
+  <!-- Handoff Intake Form Modal -->
+  <div class="modal-overlay" id="handoffModal" style="display: none;">
+    <div class="modal-content handoff-intake-modal">
+      <button class="modal-close" onclick="closeHandoffModal()">&times;</button>
+      <h2>Complete Your Booking Request</h2>
+      <p class="modal-subtitle">Please provide your contact information so our travel agent can reach you.</p>
+
+      <form id="handoffForm">
+        <div class="form-section">
+          <h3>Contact Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="contactName">Full Name *</label>
+              <input type="text" id="contactName" name="contactName" required placeholder="John Smith">
+            </div>
+            <div class="form-group">
+              <label for="contactEmail">Email Address *</label>
+              <input type="email" id="contactEmail" name="contactEmail" required placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+              <label for="contactPhone">Phone Number</label>
+              <input type="tel" id="contactPhone" name="contactPhone" placeholder="+1 (555) 123-4567">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>Travelers</h3>
+          <p class="form-help">Add all travelers for this trip</p>
+          <div id="travelersContainer">
+            <div class="traveler-row" data-index="0">
+              <input type="text" name="travelerName0" placeholder="Traveler name" required>
+              <input type="number" name="travelerAge0" placeholder="Age" min="0" max="120" class="age-input">
+              <select name="travelerType0">
+                <option value="adult">Adult (18+)</option>
+                <option value="child">Child (2-17)</option>
+                <option value="infant">Infant (0-1)</option>
+              </select>
+              <button type="button" class="btn-remove-traveler" onclick="removeTraveler(0)" style="display: none;">&times;</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addTraveler()">+ Add Another Traveler</button>
+        </div>
+
+        <div class="form-section">
+          <h3>Special Requests</h3>
+          <div class="form-group">
+            <label for="specialRequests">Any special requirements or preferences?</label>
+            <textarea id="specialRequests" name="specialRequests" rows="3" placeholder="e.g., dietary restrictions, mobility needs, room preferences, celebration occasions..."></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeHandoffModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Send to Travel Agent</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Option Detail Modal -->
+  <div class="modal-overlay" id="optionDetailModal" style="display: none;">
+    <div class="modal-content option-detail-modal">
+      <button class="modal-close" onclick="closeOptionDetailModal()">&times;</button>
+      <div id="optionDetailContent">
+        <!-- Content will be populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
   <script src="/js/api-client.js"></script>
   <script src="/js/chat.js"></script>
 </body>

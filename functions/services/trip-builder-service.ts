@@ -17,6 +17,7 @@ import { TemplateEngine, createTemplateEngine } from '../lib/template-engine';
 import { AIProviderManager, createAIProviderManager } from '../lib/ai-providers';
 import { AmadeusClient, createAmadeusClient, FlightOffer, HotelOffer } from './amadeus-client';
 import { ViatorClient, createViatorClient, TourProduct } from './viator-client';
+import { FirecrawlClient, createFirecrawlClient } from './firecrawl-client';
 
 export interface TripBuildRequest {
   tripId: string;
@@ -37,6 +38,8 @@ export class TripBuilderService {
   private aiProvider: AIProviderManager;
   private amadeusClient: AmadeusClient | null = null;
   private viatorClient: ViatorClient | null = null;
+  private firecrawlClient: FirecrawlClient | null = null;
+  private currentTripId: string | null = null;  // For telemetry context
 
   constructor(
     private env: Env,
@@ -58,6 +61,12 @@ export class TripBuilderService {
     } catch (error) {
       this.logger.warn(`Viator client not available: ${error}`);
     }
+
+    // Create Firecrawl client for URL enrichment
+    this.firecrawlClient = createFirecrawlClient(env, logger);
+    if (this.firecrawlClient) {
+      this.logger.info('Firecrawl client available for URL enrichment');
+    }
   }
 
   /**
@@ -65,6 +74,7 @@ export class TripBuilderService {
    */
   async buildTripOptions(request: TripBuildRequest): Promise<TripBuildResult> {
     const { tripId, template, confirmedDestinations, preferences } = request;
+    this.currentTripId = tripId;  // Set for telemetry context
 
     this.logger.info(`=== PHASE 2 START: Building trip options for ${tripId} ===`);
     this.logger.info(`Amadeus available: ${!!this.amadeusClient}, Viator available: ${!!this.viatorClient}`);
@@ -96,7 +106,7 @@ export class TripBuilderService {
       // Step 3: Search tours
       const tours = await this.searchTours(confirmedDestinations, preferences, costTracker);
 
-      await this.logger.logUserProgress(this.db, tripId, 'Creating trip options...', 80);
+      await this.logger.logUserProgress(this.db, tripId, 'Creating trip options...', 75);
 
       // Step 4: Generate trip options using AI
       const options = await this.generateTripOptions(
@@ -110,12 +120,17 @@ export class TripBuilderService {
         tripId
       );
 
+      await this.logger.logUserProgress(this.db, tripId, 'Finding booking URLs...', 90);
+
+      // Step 5: Enrich options with real booking URLs using Firecrawl
+      const enrichedOptions = await this.enrichBookingUrls(options, costTracker, tripId);
+
       await this.logger.logUserProgress(this.db, tripId, 'Trip options ready!', 100);
 
-      // Step 5: Store options in database
-      await this.db.updateTripOptions(tripId, options);
+      // Step 6: Store options in database
+      await this.db.updateTripOptions(tripId, enrichedOptions);
 
-      return { options };
+      return { options: enrichedOptions };
     } catch (error) {
       this.logger.error(`Trip building failed for trip ${tripId}: ${error}`);
       await this.db.updateTripStatus(tripId, 'awaiting_confirmation', 'Trip building failed. Please try again.', 0);
@@ -131,19 +146,41 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<FlightOffer[]> {
+    const startTime = Date.now();
+
     if (!this.amadeusClient) {
       this.logger.warn('Amadeus client not available, skipping flight search');
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'flight_search', {
+          provider: 'Amadeus',
+          details: { skipped: true, reason: 'Client not available' },
+        });
+      }
       return [];
     }
 
     if (!preferences.departure_airport) {
       this.logger.warn('No departure airport specified, skipping flight search');
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'flight_search', {
+          provider: 'Amadeus',
+          details: { skipped: true, reason: 'No departure airport' },
+        });
+      }
       return [];
     }
 
     // Search for round-trip flights to primary destination
     const primaryDestination = destinations[0];
     const destinationAirport = await this.amadeusClient.getAirportCode(primaryDestination);
+
+    // Log location lookup
+    if (this.currentTripId) {
+      await this.logger.logTelemetry(this.db, this.currentTripId, 'amadeus_location_lookup', {
+        provider: 'Amadeus',
+        details: { destination: primaryDestination, resolved_code: destinationAirport },
+      });
+    }
 
     // Calculate dates (for demo, use 30 days from now)
     const departureDate = preferences.departure_date || this.getDefaultDepartureDate();
@@ -160,9 +197,36 @@ export class TripBuilderService {
         max: 5,
       }, costTracker);
 
+      const elapsed = Date.now() - startTime;
+
+      // Log detailed telemetry
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'flight_search', {
+          provider: 'Amadeus',
+          duration_ms: elapsed,
+          details: {
+            origin: preferences.departure_airport,
+            destination: destinationAirport,
+            departure_date: departureDate,
+            return_date: returnDate,
+            results_count: flightOffers.length,
+            cheapest_price: flightOffers[0]?.price?.total || 'N/A',
+          },
+        });
+      }
+
       return flightOffers;
     } catch (error) {
+      const elapsed = Date.now() - startTime;
       this.logger.warn(`Flight search failed: ${error}`);
+
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'flight_search', {
+          provider: 'Amadeus',
+          duration_ms: elapsed,
+          details: { error: String(error), origin: preferences.departure_airport, destination: destinationAirport },
+        });
+      }
       return [];
     }
   }
@@ -175,12 +239,21 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<HotelOffer[]> {
+    const startTime = Date.now();
+
     if (!this.amadeusClient) {
       this.logger.warn('Amadeus client not available, skipping hotel search');
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'hotel_search', {
+          provider: 'Amadeus',
+          details: { skipped: true, reason: 'Client not available' },
+        });
+      }
       return [];
     }
 
     const allHotels: HotelOffer[] = [];
+    const searchDetails: any[] = [];
 
     const departureDate = preferences.departure_date || this.getDefaultDepartureDate();
     const duration = this.parseDuration(preferences.duration || '7 days');
@@ -189,7 +262,17 @@ export class TripBuilderService {
     let currentDate = new Date(departureDate);
 
     for (const destination of destinations) {
+      const destStartTime = Date.now();
       const cityCode = await this.amadeusClient.getCityCode(destination);
+
+      // Log location lookup
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'amadeus_location_lookup', {
+          provider: 'Amadeus',
+          details: { destination, resolved_code: cityCode, type: 'city' },
+        });
+      }
+
       const checkInDate = this.formatDate(currentDate);
       const checkOutDate = this.formatDate(new Date(currentDate.getTime() + daysPerDestination * 24 * 60 * 60 * 1000));
 
@@ -202,13 +285,45 @@ export class TripBuilderService {
           ratings: this.getHotelRatings(preferences.luxury_level),
         }, costTracker);
 
+        const destElapsed = Date.now() - destStartTime;
+        searchDetails.push({
+          destination,
+          city_code: cityCode,
+          check_in: checkInDate,
+          check_out: checkOutDate,
+          results_count: hotels.length,
+          selected_count: Math.min(hotels.length, 3),
+          duration_ms: destElapsed,
+        });
+
         allHotels.push(...hotels.slice(0, 3));  // Top 3 per destination
       } catch (error) {
         this.logger.warn(`Hotel search failed for ${destination}: ${error}`);
+        searchDetails.push({
+          destination,
+          city_code: cityCode,
+          error: String(error),
+          duration_ms: Date.now() - destStartTime,
+        });
       }
 
       // Move to next destination
       currentDate = new Date(currentDate.getTime() + daysPerDestination * 24 * 60 * 60 * 1000);
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    // Log summary telemetry
+    if (this.currentTripId) {
+      await this.logger.logTelemetry(this.db, this.currentTripId, 'hotel_search', {
+        provider: 'Amadeus',
+        duration_ms: elapsed,
+        details: {
+          destinations_searched: destinations.length,
+          total_results: allHotels.length,
+          searches: searchDetails,
+        },
+      });
     }
 
     return allHotels;
@@ -222,14 +337,24 @@ export class TripBuilderService {
     preferences: TripPreferences,
     costTracker: CostTracker
   ): Promise<TourProduct[]> {
+    const startTime = Date.now();
+
     if (!this.viatorClient) {
       this.logger.warn('Viator client not available, skipping tour search');
+      if (this.currentTripId) {
+        await this.logger.logTelemetry(this.db, this.currentTripId, 'tour_search', {
+          provider: 'Viator',
+          details: { skipped: true, reason: 'Client not available' },
+        });
+      }
       return [];
     }
 
     const allTours: TourProduct[] = [];
+    const searchDetails: any[] = [];
 
     for (const destination of destinations) {
+      const destStartTime = Date.now();
       const destinationId = this.viatorClient.getDestinationId(destination);
 
       try {
@@ -239,13 +364,181 @@ export class TripBuilderService {
           count: 5,
         }, costTracker);
 
+        const destElapsed = Date.now() - destStartTime;
+        searchDetails.push({
+          destination,
+          destination_id: destinationId,
+          results_count: tours.length,
+          selected_count: Math.min(tours.length, 3),
+          duration_ms: destElapsed,
+        });
+
         allTours.push(...tours.slice(0, 3));  // Top 3 per destination
       } catch (error) {
         this.logger.warn(`Tour search failed for ${destination}: ${error}`);
+        searchDetails.push({
+          destination,
+          destination_id: destinationId,
+          error: String(error),
+          duration_ms: Date.now() - destStartTime,
+        });
       }
     }
 
+    const elapsed = Date.now() - startTime;
+
+    // Log summary telemetry
+    if (this.currentTripId) {
+      await this.logger.logTelemetry(this.db, this.currentTripId, 'tour_search', {
+        provider: 'Viator',
+        duration_ms: elapsed,
+        details: {
+          destinations_searched: destinations.length,
+          total_results: allTours.length,
+          searches: searchDetails,
+        },
+      });
+    }
+
     return allTours;
+  }
+
+  /**
+   * Enrich trip options with real booking URLs using Firecrawl search
+   * Replaces placeholder Google Search URLs with actual booking site URLs
+   */
+  private async enrichBookingUrls(
+    options: TripOption[],
+    costTracker: CostTracker,
+    tripId: string
+  ): Promise<TripOption[]> {
+    if (!this.firecrawlClient) {
+      this.logger.info('Firecrawl not available, skipping URL enrichment');
+      await this.logger.logTelemetry(this.db, tripId, 'url_enrichment', {
+        details: { skipped: true, reason: 'Firecrawl client not available' },
+      });
+      return options;
+    }
+
+    const startTime = Date.now();
+    const telemetryCtx = { db: this.db, tripId };
+
+    this.logger.info(`Enriching booking URLs for ${options.length} trip options...`);
+
+    // Track what we've already searched to avoid duplicates
+    const hotelUrlCache = new Map<string, string>();
+    const tourUrlCache = new Map<string, string>();
+
+    const enrichedOptions: TripOption[] = [];
+    let hotelsEnriched = 0;
+    let toursEnriched = 0;
+    let totalSearches = 0;
+
+    for (const option of options) {
+      const enrichedHotels = [];
+      const enrichedTours = [];
+
+      // Enrich hotel URLs
+      for (const hotel of (option.hotels || [])) {
+        const cacheKey = `${hotel.name}|${hotel.city}`;
+
+        // Check cache first
+        if (hotelUrlCache.has(cacheKey)) {
+          enrichedHotels.push({ ...hotel, info_url: hotelUrlCache.get(cacheKey) });
+          continue;
+        }
+
+        // Skip if already has a good URL (not a Google search)
+        if (hotel.info_url && !hotel.info_url.includes('google.com/search')) {
+          enrichedHotels.push(hotel);
+          hotelUrlCache.set(cacheKey, hotel.info_url);
+          continue;
+        }
+
+        // Search for real booking URL
+        const url = await this.firecrawlClient.findBookingUrl(
+          hotel.name,
+          hotel.city,
+          'hotel',
+          costTracker,
+          telemetryCtx
+        );
+        totalSearches++;
+
+        if (url) {
+          enrichedHotels.push({ ...hotel, info_url: url });
+          hotelUrlCache.set(cacheKey, url);
+          hotelsEnriched++;
+          this.logger.debug(`Found hotel URL for ${hotel.name}: ${url}`);
+        } else {
+          enrichedHotels.push(hotel);
+          this.logger.debug(`No URL found for hotel ${hotel.name}`);
+        }
+      }
+
+      // Enrich tour URLs
+      for (const tour of (option.tours || [])) {
+        const cacheKey = `${tour.name}|${tour.city}`;
+
+        // Check cache first
+        if (tourUrlCache.has(cacheKey)) {
+          enrichedTours.push({ ...tour, info_url: tourUrlCache.get(cacheKey) });
+          continue;
+        }
+
+        // Skip if already has a good URL (not a Google search)
+        if (tour.info_url && !tour.info_url.includes('google.com/search')) {
+          enrichedTours.push(tour);
+          tourUrlCache.set(cacheKey, tour.info_url);
+          continue;
+        }
+
+        // Search for real booking URL
+        const url = await this.firecrawlClient.findBookingUrl(
+          tour.name,
+          tour.city,
+          'tour',
+          costTracker,
+          telemetryCtx
+        );
+        totalSearches++;
+
+        if (url) {
+          enrichedTours.push({ ...tour, info_url: url });
+          tourUrlCache.set(cacheKey, url);
+          toursEnriched++;
+          this.logger.debug(`Found tour URL for ${tour.name}: ${url}`);
+        } else {
+          enrichedTours.push(tour);
+          this.logger.debug(`No URL found for tour ${tour.name}`);
+        }
+      }
+
+      enrichedOptions.push({
+        ...option,
+        hotels: enrichedHotels,
+        tours: enrichedTours,
+      });
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    // Log summary telemetry
+    await this.logger.logTelemetry(this.db, tripId, 'url_enrichment', {
+      provider: 'Firecrawl',
+      duration_ms: elapsed,
+      details: {
+        options_processed: options.length,
+        total_searches: totalSearches,
+        hotels_enriched: hotelsEnriched,
+        tours_enriched: toursEnriched,
+        cache_hits: (hotelUrlCache.size - hotelsEnriched) + (tourUrlCache.size - toursEnriched),
+      },
+    });
+
+    this.logger.info(`URL enrichment complete: ${hotelsEnriched} hotels, ${toursEnriched} tours enriched in ${elapsed}ms`);
+
+    return enrichedOptions;
   }
 
   /**
@@ -274,10 +567,18 @@ export class TripBuilderService {
     // Build booking data context
     const bookingContext = this.buildBookingContext(flights, hotels, tours);
 
+    // Calculate trip duration in days
+    const tripDays = this.parseDuration(preferences.duration || '7 days');
+
+    const departureAirport = preferences.departure_airport || 'JFK';
+
     const prompt = `${optionsPrompt}
 
 CONFIRMED DESTINATIONS (You MUST use these exact locations):
 ${destinations.map((d, i) => `${i + 1}. ${d}`).join('\n')}
+
+TRIP DURATION: ${tripDays} days
+DEPARTURE AIRPORT: ${departureAirport} (ALL flights MUST depart from and return to this airport)
 
 Available booking options:
 
@@ -296,6 +597,9 @@ CRITICAL REQUIREMENTS:
 3. Do NOT use any other destinations - ONLY ${destinations.join(', ')}
 4. If booking data is unavailable, create realistic placeholder names for hotels/tours in those specific destinations
 5. Each option must include flights, hotels, tours, and total cost
+6. Include info_url for hotels (use format: https://www.google.com/search?q=HOTEL+NAME+CITY+hotel)
+7. Include info_url for tours (use format: https://www.google.com/search?q=TOUR+NAME+CITY)
+8. CRITICAL: ALL flight routes MUST use ${departureAirport} as the departure and return airport - do NOT use any other airports
 
 Format:
 [
@@ -303,23 +607,23 @@ Format:
     "option_index": 1,
     "total_cost_usd": 3500.00,
     "flights": {
-      "outbound": { "airline": "British Airways", "route": "JFK → EDI", "departure": "2025-06-01T10:00", "arrival": "2025-06-01T22:00" },
-      "return": { "airline": "British Airways", "route": "EDI → JFK", "departure": "2025-06-08T12:00", "arrival": "2025-06-08T15:00" }
+      "outbound": { "airline": "British Airways", "route": "${departureAirport} → EDI", "departure": "2025-06-01T10:00", "arrival": "2025-06-01T22:00" },
+      "return": { "airline": "British Airways", "route": "EDI → ${departureAirport}", "departure": "2025-06-08T12:00", "arrival": "2025-06-08T15:00" }
     },
     "hotels": [
-      { "city": "${destinations[0] || 'Destination 1'}", "name": "Hotel Name", "rating": 4, "nights": 4, "cost_per_night_usd": 180.00 }
+      { "city": "${destinations[0] || 'Destination 1'}", "name": "Hotel Name", "rating": 4, "nights": 4, "cost_per_night_usd": 180.00, "info_url": "https://www.google.com/search?q=Hotel+Name+City+hotel" }
     ],
     "tours": [
-      { "city": "${destinations[0] || 'Destination 1'}", "name": "Heritage Tour", "duration": "3 hours", "cost_usd": 45.00 }
+      { "city": "${destinations[0] || 'Destination 1'}", "name": "Heritage Tour", "duration": "3 hours", "cost_usd": 45.00, "info_url": "https://www.google.com/search?q=Heritage+Tour+City" }
     ],
-    "itinerary_highlights": "Brief description of activities in ${destinations.join(', ')}"
+    "itinerary_highlights": "Brief 2-3 sentence description of the trip experience in ${destinations.join(', ')}"
   }
 ]`;
 
     const aiResponse = await this.aiProvider.generate({
       prompt,
-      systemPrompt: 'You are a travel planning assistant. Respond ONLY with valid JSON arrays.',
-      maxTokens: 3000,
+      systemPrompt: 'You are a travel planning assistant. Respond ONLY with valid JSON arrays. Create realistic trip packages with accurate pricing.',
+      maxTokens: 2500,
       temperature: 0.7,
     }, costTracker);
 
@@ -352,6 +656,112 @@ Format:
     } catch (error) {
       this.logger.error(`Failed to parse AI trip options: ${error}\nResponse: ${aiResponse.text}`);
       throw new Error('Failed to generate trip options');
+    }
+  }
+
+  /**
+   * Generate daily itinerary for a specific trip option (on-demand)
+   */
+  async generateDailyItinerary(
+    tripId: string,
+    option: TripOption,
+    destinations: string[],
+    tripDays: number
+  ): Promise<TripOption> {
+    const startTime = Date.now();
+    const costTracker = createCostTracker(this.db, this.logger, tripId);
+
+    // Safely handle potentially undefined arrays
+    const hotels = option.hotels || [];
+    const tours = option.tours || [];
+
+    // Log telemetry for the request
+    await this.logger.logTelemetry(this.db, tripId, 'itinerary_generation_start', {
+      details: {
+        option_index: option.option_index,
+        destinations,
+        trip_days: tripDays,
+        hotels_count: hotels.length,
+        tours_count: tours.length,
+      },
+    });
+
+    const prompt = `Create a day-by-day itinerary for a ${tripDays}-day trip to ${destinations.join(', ')}.
+
+TRIP DETAILS:
+- Hotels: ${hotels.length > 0 ? hotels.map(h => `${h.name} in ${h.city} (${h.nights} nights)`).join(', ') : 'None specified'}
+- Tours booked: ${tours.length > 0 ? tours.map(t => `${t.name} in ${t.city}`).join(', ') : 'None specified'}
+
+Create a daily_itinerary array with one entry per day. Each day should have 3-4 activities mixing:
+- free: Free attractions, parks, viewpoints
+- walking_tour: Self-guided neighborhood walks
+- photo_op: Scenic photo spots
+- dining: Restaurant recommendations
+- tour: The booked tours (integrate them appropriately)
+
+Format as JSON array:
+[
+  {
+    "day_number": 1,
+    "city": "CityName",
+    "theme": "Arrival Day",
+    "activities": [
+      { "time": "2:00 PM", "activity": "Check in to hotel", "type": "free", "location": "Hotel Name" },
+      { "time": "4:00 PM", "activity": "Walk the historic district", "type": "walking_tour", "duration": "1.5 hours" },
+      { "time": "7:00 PM", "activity": "Dinner at local pub", "type": "dining", "location": "Pub Name", "cost_usd": 30 }
+    ]
+  }
+]`;
+
+    const aiResponse = await this.aiProvider.generate({
+      prompt,
+      systemPrompt: 'You are a travel planning assistant. Respond ONLY with a valid JSON array of daily itinerary objects.',
+      maxTokens: 3000,
+      temperature: 0.7,
+    }, costTracker);
+
+    const elapsed = Date.now() - startTime;
+
+    try {
+      const jsonMatch = aiResponse.text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('No JSON array found in AI response');
+
+      const dailyItinerary = JSON.parse(jsonMatch[0]);
+
+      // Log successful generation
+      await this.logger.logTelemetry(this.db, tripId, 'daily_itinerary_generation', {
+        provider: aiResponse.provider,
+        model: aiResponse.model,
+        tokens: aiResponse.totalTokens,
+        cost: aiResponse.cost,
+        duration_ms: elapsed,
+        details: {
+          option_index: option.option_index,
+          days_generated: dailyItinerary.length,
+          success: true,
+        },
+      });
+
+      return { ...option, daily_itinerary: dailyItinerary };
+    } catch (error) {
+      this.logger.error(`Failed to parse daily itinerary: ${error}`);
+
+      // Log failed generation
+      await this.logger.logTelemetry(this.db, tripId, 'daily_itinerary_generation', {
+        provider: aiResponse.provider,
+        model: aiResponse.model,
+        tokens: aiResponse.totalTokens,
+        cost: aiResponse.cost,
+        duration_ms: elapsed,
+        details: {
+          option_index: option.option_index,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          raw_response_preview: aiResponse.text.substring(0, 200),
+        },
+      });
+
+      throw error; // Re-throw so the API returns an error
     }
   }
 

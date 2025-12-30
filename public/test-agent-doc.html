@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Handoff - Heritage &amp; Ancestry - 6eca8e67</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.5;
+      color: #1f2937;
+      background: #fff;
+      padding: 30px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    @media print {
+      body {
+        padding: 15px;
+        font-size: 10pt;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 15px;
+    }
+
+    .header h1 {
+      font-size: 1.6em;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .header .trip-id {
+      font-size: 0.85em;
+      opacity: 0.9;
+      font-family: monospace;
+    }
+
+    .header .status-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 500;
+    }
+
+    .header .meta {
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+
+    /* Priority Alert Box */
+    .priority-box {
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .priority-box .icon {
+      font-size: 1.5em;
+    }
+
+    .priority-box .content {
+      flex: 1;
+    }
+
+    .priority-box h3 {
+      font-size: 1em;
+      color: #92400e;
+      margin-bottom: 3px;
+    }
+
+    .priority-box p {
+      font-size: 0.9em;
+      color: #78350f;
+    }
+
+    /* Section */
+    section {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    section h2 {
+      font-size: 1.1em;
+      color: #1e40af;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #dbeafe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Info Grid */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .info-item {
+      background: white;
+      padding: 12px 15px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .info-item .label {
+      font-size: 0.75em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .info-item .value {
+      font-size: 1em;
+      color: #111827;
+      font-weight: 500;
+    }
+
+    .info-item .value a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .info-item .value a:hover {
+      text-decoration: underline;
+    }
+
+    /* Client Request Box */
+    .request-box {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .request-box .label {
+      font-size: 0.75em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .request-box .content {
+      font-size: 0.95em;
+      color: #374151;
+      font-style: italic;
+      white-space: pre-wrap;
+    }
+
+    /* Destination Cards */
+    .destination-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+
+    .destination-card h4 {
+      color: #1e40af;
+      margin-bottom: 8px;
+    }
+
+    .destination-card .context {
+      font-size: 0.85em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .destination-card .rationale {
+      font-size: 0.9em;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .destination-card .sites {
+      font-size: 0.85em;
+      color: #059669;
+    }
+
+    /* Flight/Hotel/Tour Cards */
+    .booking-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 12px;
+    }
+
+    .booking-card .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .booking-card .name {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .booking-card .price {
+      font-weight: 600;
+      color: #059669;
+    }
+
+    .booking-card .details {
+      font-size: 0.9em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .booking-card .url {
+      font-size: 0.85em;
+    }
+
+    .booking-card .url a {
+      color: #2563eb;
+      word-break: break-all;
+    }
+
+    /* Day Itinerary */
+    .day-block {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      overflow: hidden;
+    }
+
+    .day-header {
+      background: #1e40af;
+      color: white;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .day-header .day-num {
+      font-weight: 600;
+    }
+
+    .day-content {
+      padding: 15px;
+    }
+
+    .activity-row {
+      display: flex;
+      gap: 15px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .activity-row:last-child {
+      border-bottom: none;
+    }
+
+    .activity-time {
+      font-weight: 600;
+      color: #1e40af;
+      min-width: 70px;
+    }
+
+    .activity-desc {
+      flex: 1;
+    }
+
+    /* Cost Summary */
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .cost-table th,
+    .cost-table td {
+      padding: 10px 15px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .cost-table th {
+      background: #f3f4f6;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .cost-table .total-row {
+      background: #dbeafe;
+      font-weight: 600;
+    }
+
+    .cost-table .total-row td {
+      color: #1e40af;
+    }
+
+    /* Next Steps Checklist */
+    .checklist {
+      list-style: none;
+    }
+
+    .checklist li {
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .checklist li:last-child {
+      border-bottom: none;
+    }
+
+    .checklist .checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #9ca3af;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Print Button */
+    .print-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1e40af;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95em;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .print-btn:hover {
+      background: #1e3a8a;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: #6b7280;
+      font-size: 0.85em;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print Document</button>
+
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <h1>🧳 Agent Handoff Document</h1>
+        <div class="trip-id">Trip ID: 6eca8e67-7ecc-4e50-8a60-814643346ea1</div>
+      </div>
+      <div class="status-badge">✓ Option Selected</div>
+    </div>
+    <div class="meta">
+      Trip Type: <strong>Heritage &amp; Ancestry</strong> •
+      Created: December 30, 2025 at 03:10 AM •
+      Document Generated: December 30, 2025
+    </div>
+  </header>
+
+  
+
+  
+    <section>
+      <h2>👤 Client Information</h2>
+      <p style="color: #6b7280; font-style: italic;">Client contact information not provided yet.</p>
+    </section>
+
+  
+  <section>
+    <h2>📝 Trip Request Details</h2>
+    <div class="info-grid">
+      <div class="info-item" style="grid-column: span 2;">
+        <div class="label">Trip Type</div>
+        <div class="value">Heritage &amp; Ancestry</div>
+      </div>
+      
+        <div class="info-item">
+          <div class="label">Trip Duration</div>
+          <div class="value">7 days</div>
+        </div>
+      
+        <div class="info-item">
+          <div class="label">Departure Airport</div>
+          <div class="value">JFK</div>
+        </div>
+      
+        <div class="info-item">
+          <div class="label">Adults</div>
+          <div class="value">2</div>
+        </div>
+      
+        <div class="info-item">
+          <div class="label">Comfort Level</div>
+          <div class="value">Comfort</div>
+        </div>
+      
+        <div class="info-item">
+          <div class="label">Activity Level</div>
+          <div class="value">Moderate</div>
+        </div>
+      
+    </div>
+    <div class="request-box">
+      <div class="label">Client's Initial Request</div>
+      <div class="content">"I want to explore my Robertson family heritage in Scotland"</div>
+    </div>
+  </section>
+
+  
+  <section>
+    <h2>🗺️ Confirmed Destinations</h2>
+    <div class="info-item" style="margin-bottom: 15px;">
+      <div class="label">Route</div>
+      <div class="value" style="font-size: 1.1em;">Edinburgh → Perth → Ayr</div>
+    </div>
+    
+    <div class="destination-card">
+      <h4>1. Edinburgh</h4>
+      <div class="context">Scotland</div>
+      <div class="rationale">Edinburgh is a major center for genealogical research in Scotland, with the National Records and National Library holding extensive collections. The city also has strong historical connections to the Robertson clan.</div>
+      <div class="sites">📍 Key sites: National Records of Scotland, National Library of Scotland, Edinburgh Castle</div>
+    </div>
+  
+    <div class="destination-card">
+      <h4>2. Perth</h4>
+      <div class="context">Perthshire, Scotland</div>
+      <div class="rationale">Perthshire was a stronghold of the Robertson clan, with many historical records and cultural sites relevant to their heritage. The regional archives in Perth hold valuable genealogical resources.</div>
+      <div class="sites">📍 Key sites: Perth and Kinross Council Archive, Balhousie Castle (Headquarters of the Black Watch Regiment), Scone Palace (historic coronation site of Scottish kings)</div>
+    </div>
+  
+    <div class="destination-card">
+      <h4>3. Ayr</h4>
+      <div class="context">Ayrshire, Scotland</div>
+      <div class="rationale">Ayrshire was the ancestral home of the Robertson family, with many historical records available through the regional archives. The area also has cultural sites of broader Scottish heritage interest.</div>
+      <div class="sites">📍 Key sites: Ayrshire Archives and Registration Service, Robert Burns Birthplace Museum, Culzean Castle (ancestral home of the Kennedys)</div>
+    </div>
+  
+    
+    <div class="request-box">
+      <div class="label">Research Summary</div>
+      <div class="content" style="font-style: normal;">Here is a 3-paragraph summary about exploring your Robertson family heritage in Scotland:
+
+Background/History: The Robertson (or Donnachaidh) clan has deep roots in the Scottish Highlands, tracing its origins back to the early medieval period. The clan takes its name from the Gaelic &quot;Clan Donnachaidh,&quot; meaning &quot;children of Duncan.&quot; Over the centuries, the Robertsons played a prominent role in Scottish history, with clan chiefs serving as respected leaders and warriors. Many Robertsons immigrated to North America and other parts of the world, spreading their legacy globally. Researching your Robertson ancestry can uncover fascinating stories about your family&#039;s storied past in Scotland.
+
+Geographic Relevance: The traditional Robertson lands were centered in Perthshire, particularly around the town of Dunkeld and the surrounding Atholl region. Key historic sites associated with the clan include Lude House, the seat of the clan chiefs, and the ruins of Struan Castle. Other important areas for Robertson heritage include Stirling, Aberdeenshire, and the Highlands more broadly, where the clan held significant landholdings and influence over the centuries.
+
+Key Attractions &amp; Practical Insights: To explore your Robertson roots, start by visiting the Clan Donnachaidh Museum in Bruar, which houses an extensive collection of clan artifacts, genealogical records, and historical exhibits. The museum can provide valuable guidance on tracing your family tree and connecting with the clan society. Consider also touring historic sites like Dunkeld Cathedral, which has strong Robertson associations, and exploring the scenic Highland landscapes that shaped your ancestors&#039; lives. The best times to visit are during the summer months when the weather is mild, though be prepared for changeable conditions typical of the Scottish climate.</div>
+    </div>
+    
+  </section>
+
+  
+  <section>
+    <h2>📋 Selected Trip Option (Option 1)</h2>
+    <div class="info-grid" style="margin-bottom: 20px;">
+      <div class="info-item">
+        <div class="label">Total Estimated Cost</div>
+        <div class="value" style="font-size: 1.3em; color: #059669;">$6700</div>
+      </div>
+      <div class="info-item">
+        <div class="label">Highlights</div>
+        <div class="value">Explore the historic landmarks and cultural heritage of Edinburgh, discover the royal history of Perth, and delve into the birthplace of Scotland&#039;s national poet, Robert Burns, in Ayr.</div>
+      </div>
+    </div>
+    
+    <h3 style="margin: 20px 0 10px; color: #374151;">✈️ Flights</h3>
+    <div class="booking-card">
+      <div class="header-row">
+        <div class="name">Outbound: Lufthansa</div>
+        <div class="price">$0</div>
+      </div>
+      <div class="details">
+        JFK → EDI<br>
+        Jul 1, 09:00 AM → Jul 1, 08:30 PM
+      </div>
+    </div>
+    <div class="booking-card">
+      <div class="header-row">
+        <div class="name">Return: Lufthansa</div>
+        <div class="price">$0</div>
+      </div>
+      <div class="details">
+        AYR → JFK<br>
+        Jul 8, 11:45 AM → Jul 8, 04:15 PM
+      </div>
+    </div>
+  
+    
+    <h3 style="margin: 20px 0 10px; color: #374151;">🏨 Hotels</h3>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Balmoral Hotel ★★★★★</div>
+          <div class="price">$900</div>
+        </div>
+        <div class="details">
+          Edinburgh • 3 nights • $300/night
+        </div>
+        <div class="url">🔗 <a href="https://www.roccofortehotels.com/hotels-and-resorts/the-balmoral-hotel/" target="_blank">https://www.roccofortehotels.com/hotels-and-resorts/the-balmoral-hotel/</a></div>
+      </div>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Mercure Perth Hotel ★★★★</div>
+          <div class="price">$360</div>
+        </div>
+        <div class="details">
+          Perth • 2 nights • $180/night
+        </div>
+        <div class="url">🔗 <a href="https://all.accor.com/hotel/1754/index.en.shtml" target="_blank">https://all.accor.com/hotel/1754/index.en.shtml</a></div>
+      </div>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Western House Hotel ★★★★</div>
+          <div class="price">$400</div>
+        </div>
+        <div class="details">
+          Ayr • 2 nights • $200/night
+        </div>
+        <div class="url">🔗 <a href="https://www.westernhousehotel.co.uk/" target="_blank">https://www.westernhousehotel.co.uk/</a></div>
+      </div>
+    
+  
+    
+    <h3 style="margin: 20px 0 10px; color: #374151;">🎯 Tours & Activities</h3>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Royal Mile Walking Tour</div>
+          <div class="price">$35</div>
+        </div>
+        <div class="details">
+          Edinburgh • 2 hours
+        </div>
+        <div class="url">🔗 <a href="https://www.tripadvisor.com/AttractionProductReview-g186525-d11456683-Royal_Mile_and_Old_Town_Walking_Tour-Edinburgh_Scotland.html" target="_blank">https://www.tripadvisor.com/AttractionProductReview-g186525-d11456683-Royal_Mile_and_Old_Town_Walking_Tour-Edinburgh_Scotland.html</a></div>
+      </div>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Scone Palace Tour</div>
+          <div class="price">$25</div>
+        </div>
+        <div class="details">
+          Perth • 1.5 hours
+        </div>
+        <div class="url">🔗 <a href="https://www.tripadvisor.com/Attraction_Review-g186565-d523252-Reviews-Scone_Palace-Perth_Perth_and_Kinross_Scotland.html" target="_blank">https://www.tripadvisor.com/Attraction_Review-g186565-d523252-Reviews-Scone_Palace-Perth_Perth_and_Kinross_Scotland.html</a></div>
+      </div>
+    
+      <div class="booking-card">
+        <div class="header-row">
+          <div class="name">Robert Burns Birthplace Museum</div>
+          <div class="price">$15</div>
+        </div>
+        <div class="details">
+          Ayr • 2 hours
+        </div>
+        <div class="url">🔗 <a href="https://www.google.com/search?q=Robert+Burns+Birthplace+Museum+Ayr" target="_blank">https://www.google.com/search?q=Robert+Burns+Birthplace+Museum+Ayr</a></div>
+      </div>
+    
+  
+  </section>
+
+  
+  <section class="page-break">
+    <h2>📅 Daily Itinerary</h2>
+    
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Arrival Day"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">2:00 PM</span>
+            <span class="activity-desc">Check in to Balmoral Hotel</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">4:00 PM</span>
+            <span class="activity-desc">Walk the historic Royal Mile</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">7:00 PM</span>
+            <span class="activity-desc">Dinner at The Scotch Whisky Experience</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Exploring the Old Town"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">9:00 AM</span>
+            <span class="activity-desc">Royal Mile Walking Tour</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">11:30 AM</span>
+            <span class="activity-desc">Visit Edinburgh Castle</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">1:30 PM</span>
+            <span class="activity-desc">Lunch at Deacon Brodies Tavern</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">3:00 PM</span>
+            <span class="activity-desc">Explore the Grassmarket and Victoria Street</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Views and Nature"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">9:00 AM</span>
+            <span class="activity-desc">Hike to Arthur&#039;s Seat</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">11:30 AM</span>
+            <span class="activity-desc">Visit the Royal Botanic Garden</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">1:30 PM</span>
+            <span class="activity-desc">Lunch at Café Royal Circle</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">3:00 PM</span>
+            <span class="activity-desc">Explore Calton Hill for panoramic views</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Arrival and Exploring Perth"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">11:00 AM</span>
+            <span class="activity-desc">Check in to Mercure Perth Hotel</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">12:30 PM</span>
+            <span class="activity-desc">Lunch at The Bothy</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">2:00 PM</span>
+            <span class="activity-desc">Stroll along the River Tay</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">4:00 PM</span>
+            <span class="activity-desc">Visit Scone Palace</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Day Trip to Loch Lomond"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">9:00 AM</span>
+            <span class="activity-desc">Drive to Loch Lomond</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">10:30 AM</span>
+            <span class="activity-desc">Hike the Conic Hill Trail</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">1:00 PM</span>
+            <span class="activity-desc">Lunch at the Loch Lomond Arms Hotel</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">3:00 PM</span>
+            <span class="activity-desc">Explore the Loch Lomond Shores</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Arrival and Robert Burns"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">11:00 AM</span>
+            <span class="activity-desc">Check in to Western House Hotel</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">12:30 PM</span>
+            <span class="activity-desc">Lunch at The Treehouse</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">2:00 PM</span>
+            <span class="activity-desc">Visit the Robert Burns Birthplace Museum</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">4:00 PM</span>
+            <span class="activity-desc">Explore the Ayr Seafront</span>
+          </div>
+        
+      </div>
+    </div>
+  
+    <div class="day-block">
+      <div class="day-header">
+        <span class="day-num">Day undefined</span>
+        <span></span>
+      </div>
+      <div class="day-content">
+        <div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"Coastal Exploration"</div>
+        
+          <div class="activity-row">
+            <span class="activity-time">9:00 AM</span>
+            <span class="activity-desc">Visit Culzean Castle and Country Park</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">11:30 AM</span>
+            <span class="activity-desc">Hike the Ayrshire Coastal Path</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">1:30 PM</span>
+            <span class="activity-desc">Lunch at The Waterfront</span>
+          </div>
+        
+          <div class="activity-row">
+            <span class="activity-time">3:00 PM</span>
+            <span class="activity-desc">Explore the Dunure Harbour and Castle</span>
+          </div>
+        
+      </div>
+    </div>
+  
+  </section>
+
+  
+  <section>
+    <h2>💰 Cost Breakdown</h2>
+    <table class="cost-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th style="text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Flights (roundtrip)</td>
+          <td style="text-align: right;">$0</td>
+        </tr>
+        <tr>
+          <td>Accommodations (3 hotels)</td>
+          <td style="text-align: right;">$1660</td>
+        </tr>
+        <tr>
+          <td>Tours & Activities (3 items)</td>
+          <td style="text-align: right;">$75</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>Total Estimated Cost</strong></td>
+          <td style="text-align: right;"><strong>$6700</strong></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top: 15px; font-size: 0.85em; color: #6b7280;">
+      * Prices are estimates and may vary. Final pricing will be confirmed at time of booking.
+    </p>
+  </section>
+
+  
+  <section>
+    <h2>✅ Agent Checklist</h2>
+    <ul class="checklist">
+      <li>
+        <div class="checkbox"></div>
+        <span>Review client request and special requirements</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Verify flight availability and confirm pricing</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Check hotel availability and room types</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Confirm tour bookings and group sizes</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Prepare detailed proposal with final pricing</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Contact client within 24 hours</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Follow up on client questions and adjustments</span>
+      </li>
+      <li>
+        <div class="checkbox"></div>
+        <span>Process booking and send confirmation</span>
+      </li>
+    </ul>
+  </section>
+
+  <footer class="footer">
+    <strong>VoyGent</strong> - AI-Powered Travel Planning<br>
+    This document was auto-generated. Please verify all details before booking.
+  </footer>
+</body>
+</html>

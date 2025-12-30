@@ -4,8 +4,15 @@
  * Marks trip as ready for agent review
  */
 
-import { Env, createDatabaseClient, TripOption, Destination } from '../../../lib/db';
+import { Env, createDatabaseClient, TripOption, Destination, DayItinerary } from '../../../lib/db';
 import { createLogger } from '../../../lib/logger';
+import { createTripBuilderService } from '../../../services/trip-builder-service';
+
+interface TravelerInfo {
+  name: string;
+  age?: number;
+  type: 'adult' | 'child' | 'infant';
+}
 
 interface HandoffRequest {
   user_contact?: {
@@ -13,6 +20,7 @@ interface HandoffRequest {
     email: string;
     phone?: string;
   };
+  travelers?: TravelerInfo[];
   special_requests?: string;
 }
 
@@ -68,10 +76,38 @@ export async function onRequestPost(context: { request: Request; env: Env; param
 
     // Parse trip data
     const options: TripOption[] = JSON.parse(trip.options_json);
-    const selectedOption = options.find(opt => opt.option_index === trip.selected_option_index);
+    let selectedOption = options.find(opt => opt.option_index === trip.selected_option_index);
     const destinations: Destination[] = trip.confirmed_destinations
       ? JSON.parse(trip.confirmed_destinations).map((name: string) => ({ name }))
       : [];
+
+    // Generate daily itinerary on-demand if not present
+    if (selectedOption && (!selectedOption.daily_itinerary || selectedOption.daily_itinerary.length === 0)) {
+      try {
+        const preferences = trip.preferences_json ? JSON.parse(trip.preferences_json) : {};
+        const tripDays = parseInt(preferences.duration?.match(/\d+/)?.[0] || '7');
+        const destinationNames = destinations.map(d => typeof d === 'string' ? d : d.name);
+
+        const tripBuilder = createTripBuilderService(context.env, db, logger);
+        selectedOption = await tripBuilder.generateDailyItinerary(
+          tripId,
+          selectedOption,
+          destinationNames,
+          tripDays
+        );
+
+        // Update the option in the database for caching
+        const updatedOptions = options.map(o =>
+          o.option_index === selectedOption!.option_index ? selectedOption! : o
+        );
+        await db.updateTripOptions(tripId, updatedOptions);
+
+        logger.info(`Generated daily itinerary for trip ${tripId}`);
+      } catch (error) {
+        logger.warn(`Failed to generate daily itinerary, continuing without it: ${error}`);
+        // Continue without daily itinerary
+      }
+    }
 
     // Generate handoff document
     const handoffDocument = generateHandoffDocument(
@@ -80,6 +116,7 @@ export async function onRequestPost(context: { request: Request; env: Env; param
       destinations,
       selectedOption!,
       body.user_contact,
+      body.travelers,
       body.special_requests
     );
 
@@ -124,6 +161,7 @@ function generateHandoffDocument(
   destinations: Destination[],
   selectedOption: TripOption,
   userContact?: { name: string; email: string; phone?: string },
+  travelers?: TravelerInfo[],
   specialRequests?: string
 ): any {
   return {
@@ -151,7 +189,7 @@ function generateHandoffDocument(
       },
     },
 
-    // Hotels
+    // Hotels with info links
     hotels: selectedOption.hotels.map(hotel => ({
       city: hotel.city,
       name: hotel.name,
@@ -159,25 +197,33 @@ function generateHandoffDocument(
       nights: hotel.nights,
       cost_per_night_usd: hotel.cost_per_night_usd,
       total_cost_usd: hotel.nights * hotel.cost_per_night_usd,
+      info_url: hotel.info_url || null,
     })),
 
-    // Tours & Activities
+    // Tours & Activities with info links
     tours: selectedOption.tours.map(tour => ({
       city: tour.city,
       name: tour.name,
       duration: tour.duration,
       cost_usd: tour.cost_usd,
+      info_url: tour.info_url || null,
     })),
+
+    // Daily Itinerary
+    daily_itinerary: selectedOption.daily_itinerary || [],
 
     // Itinerary Highlights
     itinerary_highlights: selectedOption.itinerary_highlights,
 
-    // User Contact
+    // Customer Information
     user_contact: userContact || {
       name: 'Not provided',
       email: 'Not provided',
       phone: 'Not provided',
     },
+
+    // Travelers
+    travelers: travelers || [],
 
     // Special Requests
     special_requests: specialRequests || 'None',

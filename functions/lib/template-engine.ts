@@ -58,21 +58,30 @@ export class TemplateEngine {
    *
    * @param userMessage - Initial user message (e.g., "Sullivan family from Cork, Ireland")
    * @param preferences - Trip preferences from preferences panel
+   * @param template - Optional template to check which placeholders are needed
    * @returns Context object for template interpolation
    */
-  extractContext(userMessage: string, preferences?: TripPreferences): TemplateContext {
+  extractContext(userMessage: string, preferences?: TripPreferences, template?: TripTemplate): TemplateContext {
     const context: TemplateContext = {};
 
-    // Extract surname (basic heuristic: first capitalized word)
-    const surnameMatch = userMessage.match(/\b([A-Z][a-z]+)\b/);
-    if (surnameMatch) {
-      context.surname = surnameMatch[1];
+    // Only extract surname/region if the template uses these placeholders
+    // This prevents extracting "France" as a surname for Historical Sites trips
+    const neededPlaceholders = template ? this.extractPlaceholders(template) : [];
+
+    if (neededPlaceholders.includes('surname')) {
+      // Extract surname (basic heuristic: first capitalized word)
+      const surnameMatch = userMessage.match(/\b([A-Z][a-z]+)\b/);
+      if (surnameMatch) {
+        context.surname = surnameMatch[1];
+      }
     }
 
-    // Extract region (look for "from [Region]" pattern)
-    const regionMatch = userMessage.match(/from\s+([A-Z][a-zA-Z\s,]+)/i);
-    if (regionMatch) {
-      context.region = regionMatch[1].trim();
+    if (neededPlaceholders.includes('region')) {
+      // Extract region (look for "from [Region]" pattern)
+      const regionMatch = userMessage.match(/from\s+([A-Z][a-zA-Z\s,]+)/i);
+      if (regionMatch) {
+        context.region = regionMatch[1].trim();
+      }
     }
 
     // Add preferences to context

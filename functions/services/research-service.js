@@ -13,6 +13,7 @@ import { createCostTracker } from '../lib/cost-tracker';
 import { createTemplateEngine } from '../lib/template-engine';
 import { createAIProviderManager } from '../lib/ai-providers';
 import { createSearchClient } from './search-client';
+import { FirecrawlClient, createFirecrawlClient } from './firecrawl-client';
 /**
  * Research Service
  */
@@ -23,6 +24,7 @@ export class ResearchService {
     templateEngine;
     aiProvider;
     searchClient;
+    firecrawlClient;
     constructor(env, db, logger) {
         this.env = env;
         this.db = db;
@@ -30,6 +32,7 @@ export class ResearchService {
         this.templateEngine = createTemplateEngine();
         this.aiProvider = createAIProviderManager(env, logger);
         this.searchClient = createSearchClient(env, logger);
+        this.firecrawlClient = createFirecrawlClient(env, logger);
     }
     /**
      * Perform destination research
@@ -67,13 +70,16 @@ export class ResearchService {
                     by_query: searchResults.map(r => ({ query: r.query, count: r.results.length })),
                 },
             });
+            await this.logger.logUserProgress(this.db, tripId, 'Extracting detailed content...', 40);
+            // Step 3b: Enrich top search results with Firecrawl
+            const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId);
             await this.logger.logUserProgress(this.db, tripId, 'Analyzing results...', 50);
             // Step 4: Generate and store research summary
-            const researchSummary = await this.generateResearchSummary(queries, searchResults, template, context, costTracker, tripId);
+            const researchSummary = await this.generateResearchSummary(queries, enrichedResults, template, context, costTracker, tripId);
             await this.db.updateResearchSummary(tripId, researchSummary);
             await this.logger.logUserProgress(this.db, tripId, 'Identifying destinations...', 60);
-            // Step 5: Synthesize results with AI
-            const destinations = await this.synthesizeDestinations(template, context, searchResults, costTracker, tripId);
+            // Step 5: Synthesize results with AI (using enriched content)
+            const destinations = await this.synthesizeDestinations(template, context, enrichedResults, costTracker, tripId);
             await this.logger.logUserProgress(this.db, tripId, 'Preparing recommendations...', 80);
             // Step 5: Store research destinations
             await this.db.updateResearchDestinations(tripId, destinations);
@@ -96,16 +102,21 @@ export class ResearchService {
     /**
      * Synthesize destinations from search results using AI
      */
-    async synthesizeDestinations(template, context, searchResults, costTracker, tripId) {
+    async synthesizeDestinations(template, context, enrichedResults, costTracker, tripId) {
         // Build synthesis prompt
         const synthesisPrompt = this.templateEngine.buildResearchSynthesis(template, context);
         const criteriaPrompt = this.templateEngine.buildDestinationCriteria(template, context);
-        // Concatenate search results into context
+        // Concatenate search results into context (including enriched content)
         let searchContext = 'Web search results:\n\n';
-        searchResults.forEach((response, index) => {
+        enrichedResults.forEach((response, index) => {
             searchContext += `Query ${index + 1}: "${response.query}"\n`;
             response.results.forEach((result, resultIndex) => {
-                searchContext += `${resultIndex + 1}. ${result.title}\n   ${result.snippet}\n   ${result.url}\n\n`;
+                searchContext += `${resultIndex + 1}. ${result.title}\n`;
+                searchContext += `   Summary: ${result.snippet}\n`;
+                if (result.enrichedContent) {
+                    searchContext += `   Full content:\n   ${result.enrichedContent.substring(0, 1500)}\n`;
+                }
+                searchContext += `   Source: ${result.url}\n\n`;
             });
             searchContext += '\n';
         });
@@ -161,7 +172,7 @@ Generate 2-4 destinations that match the user's request.`;
             details: {
                 region: context.region || 'not specified',
                 surname: context.surname || 'not specified',
-                search_results_count: searchResults.reduce((sum, r) => sum + r.results.length, 0),
+                search_results_count: enrichedResults.reduce((sum, r) => sum + r.results.length, 0),
             },
         });
         // Parse JSON response
@@ -218,10 +229,10 @@ Generate a friendly, conversational message presenting these destinations to the
     /**
      * Generate research summary from search results
      */
-    async generateResearchSummary(queries, searchResults, _template, context, costTracker, tripId) {
+    async generateResearchSummary(queries, enrichedResults, _template, context, costTracker, tripId) {
         // Extract unique sources from search results
         const sourcesMap = new Map();
-        searchResults.forEach((response) => {
+        enrichedResults.forEach((response) => {
             response.results.forEach((result) => {
                 if (!sourcesMap.has(result.url)) {
                     sourcesMap.set(result.url, { title: result.title, url: result.url });
@@ -229,9 +240,14 @@ Generate a friendly, conversational message presenting these destinations to the
             });
         });
         const sources = Array.from(sourcesMap.values()).slice(0, 8); // Top 8 sources
-        // Build summary prompt
-        const searchContext = searchResults.map((response) => {
-            return response.results.map((r) => `- ${r.title}: ${r.snippet}`).join('\n');
+        // Build summary prompt (use enriched content when available)
+        const searchContext = enrichedResults.map((response) => {
+            return response.results.map((r) => {
+                if (r.enrichedContent) {
+                    return `- ${r.title}:\n  ${r.enrichedContent.substring(0, 500)}`;
+                }
+                return `- ${r.title}: ${r.snippet}`;
+            }).join('\n');
         }).join('\n\n');
         // Get theme name for context
         const themeName = _template.name || 'travel';
@@ -275,7 +291,8 @@ Be specific with place names and facts. This summary helps the traveler understa
      */
     async extractContextWithAI(userMessage, template, preferences, costTracker, tripId) {
         // Start with basic regex extraction for backward compatibility
-        const baseContext = this.templateEngine.extractContext(userMessage, preferences);
+        // Pass template so extraction only happens for placeholders the template actually uses
+        const baseContext = this.templateEngine.extractContext(userMessage, preferences, template);
         // Get template-specific placeholders
         const placeholders = this.templateEngine.extractPlaceholders(template);
         if (placeholders.length === 0) {
@@ -326,6 +343,67 @@ Be specific with place names and facts. This summary helps the traveler understa
             ...baseContext,
             topic: userMessage,
         };
+    }
+    /**
+     * Enrich search results by scraping top URLs with Firecrawl
+     * Takes top 2 URLs per query and extracts full content
+     */
+    async enrichSearchResults(searchResults, costTracker, tripId) {
+        if (!this.firecrawlClient) {
+            this.logger.debug('Firecrawl not available, using search snippets only');
+            return searchResults.map(r => ({
+                query: r.query,
+                results: r.results.map(result => ({
+                    title: result.title,
+                    url: result.url,
+                    snippet: result.snippet,
+                })),
+            }));
+        }
+        const urlsToScrape = [];
+        const urlToQueryMap = new Map();
+        // Collect top 2 URLs per query
+        searchResults.forEach((response, queryIndex) => {
+            response.results.slice(0, 2).forEach(result => {
+                if (!urlsToScrape.includes(result.url)) {
+                    urlsToScrape.push(result.url);
+                    urlToQueryMap.set(result.url, queryIndex);
+                }
+            });
+        });
+        this.logger.info(`Enriching ${urlsToScrape.length} URLs with Firecrawl...`);
+        // Scrape URLs in parallel (with concurrency limit and telemetry)
+        const scrapeResults = await this.firecrawlClient.scrapeMultiple(urlsToScrape, { formats: ['markdown'], onlyMainContent: true }, costTracker, 3, // Concurrency limit
+        { db: this.db, tripId } // Telemetry context
+        );
+        // Build map of URL to scraped content
+        const contentMap = new Map();
+        scrapeResults.forEach(result => {
+            if (result.success && result.markdown) {
+                const summary = FirecrawlClient.extractSummary(result.markdown, 2000);
+                contentMap.set(result.url, summary);
+            }
+        });
+        // Log enrichment results
+        const successCount = scrapeResults.filter(r => r.success).length;
+        await this.logger.logTelemetry(this.db, tripId, 'content_enrichment', {
+            provider: 'Firecrawl',
+            details: {
+                urls_scraped: urlsToScrape.length,
+                successful: successCount,
+                failed: urlsToScrape.length - successCount,
+            },
+        });
+        // Build enriched results
+        return searchResults.map(response => ({
+            query: response.query,
+            results: response.results.map(result => ({
+                title: result.title,
+                url: result.url,
+                snippet: result.snippet,
+                enrichedContent: contentMap.get(result.url),
+            })),
+        }));
     }
     /**
      * Handle user refinement request (add/remove/modify destinations)

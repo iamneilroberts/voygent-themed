@@ -12,6 +12,7 @@ export interface Env {
   VIATOR_API_KEY?: string;
   SERPER_API_KEY?: string;
   TAVILY_API_KEY?: string;
+  FIRECRAWL_API_KEY?: string;
   ZAI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   ADMIN_JWT_SECRET?: string;
@@ -127,10 +128,36 @@ export interface TripPreferences {
   duration?: string;
   travelers_adults?: number;
   travelers_children?: number;
+  traveler_ages?: number[];  // Ages of all travelers for smarter recommendations
   luxury_level?: 'Budget' | 'Comfort' | 'Luxury';
   activity_level?: 'Relaxed' | 'Moderate' | 'Active';
   departure_airport?: string;
   departure_date?: string;
+  home_country?: string;  // For driving side analysis (e.g., "US", "UK")
+
+  // New: Destination count preference
+  num_destinations?: number;  // If not set, AI determines based on duration/activity
+
+  // New: Transportation preferences
+  transportation_preference?: 'rental_car' | 'public_transit' | 'driver_hire' | 'flexible';
+  driving_comfort?: 'comfortable_abroad' | 'prefer_familiar' | 'no_driving';
+}
+
+export interface TransportationRecommendation {
+  primary_mode: 'rental_car' | 'public_transit' | 'driver_hire' | 'tour_bus' | 'mixed';
+  reasoning: string;
+  considerations: string[];  // e.g., "Driving is on the left in Ireland"
+  recommendations_by_segment: TransportSegment[];
+  estimated_cost_usd: number;
+}
+
+export interface TransportSegment {
+  from: string;
+  to: string;
+  recommended_mode: string;
+  duration: string;
+  notes: string;
+  cost_estimate_usd?: number;
 }
 
 export interface TripOption {
@@ -143,6 +170,8 @@ export interface TripOption {
   hotels: Hotel[];
   tours: Tour[];
   itinerary_highlights: string;
+  daily_itinerary?: DayItinerary[];
+  transportation?: TransportationRecommendation;  // Generated after option selection
 }
 
 export interface Flight {
@@ -158,6 +187,7 @@ export interface Hotel {
   rating: number;
   nights: number;
   cost_per_night_usd: number;
+  info_url?: string;  // Link to hotel info page
 }
 
 export interface Tour {
@@ -165,6 +195,25 @@ export interface Tour {
   name: string;
   duration: string;
   cost_usd: number;
+  info_url?: string;  // Link to tour info page
+}
+
+export interface DailyActivity {
+  time: string;  // e.g., "9:00 AM", "Afternoon"
+  activity: string;
+  type: 'free' | 'paid' | 'dining' | 'walking_tour' | 'photo_op' | 'tour';
+  cost_usd?: number;
+  duration?: string;
+  notes?: string;
+  location?: string;
+}
+
+export interface DayItinerary {
+  day_number: number;
+  date?: string;
+  city: string;
+  theme?: string;  // e.g., "Heritage Discovery", "Cultural Immersion"
+  activities: DailyActivity[];
 }
 
 export interface TelemetryLog {

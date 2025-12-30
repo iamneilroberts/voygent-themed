@@ -225,4 +225,8 @@ export const API_CALL_COSTS = {
   Tavily: {
     'Search': 0.001,  // Estimate
   },
+  Firecrawl: {
+    'Scrape': 0.01,  // ~$0.01 per page scrape
+    'Search': 0.01,  // ~$0.01 per search query
+  },
 };

@@ -130,9 +130,35 @@ class APIClient {
   }
 
   /**
-   * Generate handoff document
+   * Generate daily itinerary for a trip option (on-demand)
+   * @param {string} tripId - Trip ID
+   * @param {number} optionIndex - Option index to generate itinerary for
    */
-  async generateHandoff(tripId, userContact = null, specialRequests = null) {
+  async generateItinerary(tripId, optionIndex) {
+    const response = await fetch(`${API_BASE_URL}/api/trips/${tripId}/itinerary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ option_index: optionIndex }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate itinerary');
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Generate handoff document
+   * @param {string} tripId - Trip ID
+   * @param {Object} userContact - Contact info { name, email, phone }
+   * @param {Array} travelers - Array of { name, age, type: 'adult'|'child'|'infant' }
+   * @param {string} specialRequests - Special requests text
+   */
+  async generateHandoff(tripId, userContact = null, travelers = null, specialRequests = null) {
     const response = await fetch(`${API_BASE_URL}/api/trips/${tripId}/handoff`, {
       method: 'POST',
       headers: {
@@ -140,6 +166,7 @@ class APIClient {
       },
       body: JSON.stringify({
         user_contact: userContact,
+        travelers: travelers,
         special_requests: specialRequests,
       }),
     });
@@ -150,6 +177,25 @@ class APIClient {
     }
 
     return await response.json();
+  }
+
+  /**
+   * Download trip document as HTML
+   * Opens in new tab or downloads based on browser behavior
+   * @param {string} tripId - Trip ID
+   */
+  downloadDocument(tripId) {
+    // Open in new tab - browser will download due to Content-Disposition header
+    window.open(`${API_BASE_URL}/api/trips/${tripId}/document`, '_blank');
+  }
+
+  /**
+   * Download agent handoff document as HTML
+   * Includes full client intake info and all preferences
+   * @param {string} tripId - Trip ID
+   */
+  downloadAgentDocument(tripId) {
+    window.open(`${API_BASE_URL}/api/trips/${tripId}/agent-document`, '_blank');
   }
 }
 

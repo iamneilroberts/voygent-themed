@@ -5,6 +5,7 @@
  */
 import { createDatabaseClient } from '../../../lib/db';
 import { createLogger } from '../../../lib/logger';
+import { createTripBuilderService } from '../../../services/trip-builder-service';
 export async function onRequestPost(context) {
     const logger = createLogger();
     const db = createDatabaseClient(context.env);
@@ -41,12 +42,30 @@ export async function onRequestPost(context) {
         }
         // Parse trip data
         const options = JSON.parse(trip.options_json);
-        const selectedOption = options.find(opt => opt.option_index === trip.selected_option_index);
+        let selectedOption = options.find(opt => opt.option_index === trip.selected_option_index);
         const destinations = trip.confirmed_destinations
             ? JSON.parse(trip.confirmed_destinations).map((name) => ({ name }))
             : [];
+        // Generate daily itinerary on-demand if not present
+        if (selectedOption && (!selectedOption.daily_itinerary || selectedOption.daily_itinerary.length === 0)) {
+            try {
+                const preferences = trip.preferences_json ? JSON.parse(trip.preferences_json) : {};
+                const tripDays = parseInt(preferences.duration?.match(/\d+/)?.[0] || '7');
+                const destinationNames = destinations.map(d => typeof d === 'string' ? d : d.name);
+                const tripBuilder = createTripBuilderService(context.env, db, logger);
+                selectedOption = await tripBuilder.generateDailyItinerary(tripId, selectedOption, destinationNames, tripDays);
+                // Update the option in the database for caching
+                const updatedOptions = options.map(o => o.option_index === selectedOption.option_index ? selectedOption : o);
+                await db.updateTripOptions(tripId, updatedOptions);
+                logger.info(`Generated daily itinerary for trip ${tripId}`);
+            }
+            catch (error) {
+                logger.warn(`Failed to generate daily itinerary, continuing without it: ${error}`);
+                // Continue without daily itinerary
+            }
+        }
         // Generate handoff document
-        const handoffDocument = generateHandoffDocument(trip.id, template.name, destinations, selectedOption, body.user_contact, body.special_requests);
+        const handoffDocument = generateHandoffDocument(trip.id, template.name, destinations, selectedOption, body.user_contact, body.travelers, body.special_requests);
         // Update trip status
         await db.updateTripStatus(tripId, 'handoff_sent', 'Your trip request has been sent to a travel professional', 100);
         logger.info(`Handoff document generated for trip ${tripId}`);
@@ -74,7 +93,7 @@ export async function onRequestPost(context) {
 /**
  * Generate handoff document for travel agent
  */
-function generateHandoffDocument(tripId, tripType, destinations, selectedOption, userContact, specialRequests) {
+function generateHandoffDocument(tripId, tripType, destinations, selectedOption, userContact, travelers, specialRequests) {
     return {
         trip_id: tripId,
         created_at: new Date().toISOString(),
@@ -97,7 +116,7 @@ function generateHandoffDocument(tripId, tripType, destinations, selectedOption,
                 arrival: selectedOption.flights.return.arrival,
             },
         },
-        // Hotels
+        // Hotels with info links
         hotels: selectedOption.hotels.map(hotel => ({
             city: hotel.city,
             name: hotel.name,
@@ -105,22 +124,28 @@ function generateHandoffDocument(tripId, tripType, destinations, selectedOption,
             nights: hotel.nights,
             cost_per_night_usd: hotel.cost_per_night_usd,
             total_cost_usd: hotel.nights * hotel.cost_per_night_usd,
+            info_url: hotel.info_url || null,
         })),
-        // Tours & Activities
+        // Tours & Activities with info links
         tours: selectedOption.tours.map(tour => ({
             city: tour.city,
             name: tour.name,
             duration: tour.duration,
             cost_usd: tour.cost_usd,
+            info_url: tour.info_url || null,
         })),
+        // Daily Itinerary
+        daily_itinerary: selectedOption.daily_itinerary || [],
         // Itinerary Highlights
         itinerary_highlights: selectedOption.itinerary_highlights,
-        // User Contact
+        // Customer Information
         user_contact: userContact || {
             name: 'Not provided',
             email: 'Not provided',
             phone: 'Not provided',
         },
+        // Travelers
+        travelers: travelers || [],
         // Special Requests
         special_requests: specialRequests || 'None',
         // Agent Notes

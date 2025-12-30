@@ -16,6 +16,17 @@ import { CostTracker, createCostTracker } from '../lib/cost-tracker';
 import { TemplateEngine, createTemplateEngine } from '../lib/template-engine';
 import { AIProviderManager, createAIProviderManager } from '../lib/ai-providers';
 import { SearchClient, createSearchClient, SearchResponse } from './search-client';
+import { FirecrawlClient, createFirecrawlClient, ScrapeResult } from './firecrawl-client';
+
+export interface EnrichedSearchResult {
+  query: string;
+  results: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    enrichedContent?: string;  // Full content from Firecrawl
+  }>;
+}
 
 export interface ResearchRequest {
   tripId: string;
@@ -30,12 +41,40 @@ export interface ResearchResult {
 }
 
 /**
+ * AI-interpreted research context
+ * Replaces hardcoded placeholder extraction with intelligent interpretation
+ */
+export interface InterpretedResearchContext {
+  // AI-generated search queries tailored to the request
+  search_queries: string[];
+
+  // Key details extracted from user message
+  extracted_details: {
+    primary_interest: string;  // Main focus (e.g., "hiking", "ancestry research", "historical sites")
+    geographic_focus?: string;  // Location constraint if any
+    specific_requirements?: string[];  // Specific things mentioned
+  };
+
+  // Constraints for destination synthesis
+  constraints: {
+    geographic_region?: string;  // e.g., "British Columbia", "Ireland"
+    thematic_focus?: string;  // e.g., "outdoor adventure", "family heritage"
+    suggested_num_destinations: number;  // AI-determined based on trip params
+    reasoning: string;  // Why this number of destinations
+  };
+
+  // Raw context for logging
+  raw_interpretation: string;
+}
+
+/**
  * Research Service
  */
 export class ResearchService {
   private templateEngine: TemplateEngine;
   private aiProvider: AIProviderManager;
   private searchClient: SearchClient;
+  private firecrawlClient: FirecrawlClient | null;
 
   constructor(
     private env: Env,
@@ -45,6 +84,122 @@ export class ResearchService {
     this.templateEngine = createTemplateEngine();
     this.aiProvider = createAIProviderManager(env, logger);
     this.searchClient = createSearchClient(env, logger);
+    this.firecrawlClient = createFirecrawlClient(env, logger);
+  }
+
+  /**
+   * AI-powered interpretation of user request
+   * Generates smart search queries and extracts context without hardcoded placeholders
+   */
+  private async interpretUserRequest(
+    userMessage: string,
+    template: TripTemplate,
+    preferences: TripPreferences | undefined,
+    costTracker: CostTracker,
+    tripId: string
+  ): Promise<InterpretedResearchContext> {
+    const duration = preferences?.duration || '7 days';
+    const activityLevel = preferences?.activity_level || 'Moderate';
+    const numTravelers = (preferences?.travelers_adults || 2) + (preferences?.travelers_children || 0);
+    const userNumDestinations = preferences?.num_destinations;
+
+    const prompt = `You are a travel research assistant helping plan a "${template.name}" trip.
+
+TEMPLATE THEME: ${template.name}
+TEMPLATE DESCRIPTION: ${template.description}
+${template.example_inputs ? `EXAMPLE REQUESTS FOR THIS THEME: ${JSON.parse(template.example_inputs).join(', ')}` : ''}
+
+USER'S REQUEST: "${userMessage}"
+
+TRIP PARAMETERS:
+- Duration: ${duration}
+- Activity Level: ${activityLevel}
+- Number of Travelers: ${numTravelers}
+${preferences?.traveler_ages ? `- Traveler Ages: ${preferences.traveler_ages.join(', ')}` : ''}
+${userNumDestinations ? `- Requested Destinations: ${userNumDestinations}` : '- Destinations: Not specified (you decide)'}
+
+YOUR TASK:
+1. Understand what the user wants based on their message and the template theme
+2. Generate 2-4 web search queries that will find relevant destination information
+3. Extract key details from their request
+4. Determine how many destinations are appropriate (if not specified)
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "search_queries": [
+    "specific search query 1 for finding destinations",
+    "specific search query 2 for finding destinations"
+  ],
+  "extracted_details": {
+    "primary_interest": "main focus of the trip",
+    "geographic_focus": "location/region if mentioned, or null",
+    "specific_requirements": ["any specific things mentioned"]
+  },
+  "constraints": {
+    "geographic_region": "specific region to focus on, or null",
+    "thematic_focus": "the theme/type of experience",
+    "suggested_num_destinations": 3,
+    "reasoning": "Brief explanation of why this number of destinations"
+  },
+  "raw_interpretation": "One sentence summary of what the user wants"
+}`;
+
+    try {
+      const aiResponse = await this.aiProvider.generate(
+        {
+          prompt,
+          systemPrompt: 'You are a travel research assistant. Respond with valid JSON only. Generate search queries that will find real destinations and travel information.',
+          maxTokens: 600,
+          temperature: 0.3,
+        },
+        costTracker
+      );
+
+      await this.logger.logTelemetry(this.db, tripId, 'request_interpretation', {
+        provider: aiResponse.provider,
+        model: aiResponse.model,
+        tokens: aiResponse.totalTokens,
+        cost: aiResponse.cost,
+        details: { user_message_preview: userMessage.substring(0, 100) },
+      });
+
+      // Parse AI response
+      const jsonMatch = aiResponse.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const interpreted = JSON.parse(jsonMatch[0]) as InterpretedResearchContext;
+
+        // Override with user preference if specified
+        if (userNumDestinations) {
+          interpreted.constraints.suggested_num_destinations = userNumDestinations;
+          interpreted.constraints.reasoning = `User specified ${userNumDestinations} destinations`;
+        }
+
+        this.logger.info(`AI interpretation: ${JSON.stringify(interpreted)}`);
+        return interpreted;
+      }
+    } catch (error) {
+      this.logger.error(`AI interpretation failed: ${error}`);
+    }
+
+    // Fallback: basic interpretation
+    return {
+      search_queries: [
+        `${template.name} ${userMessage} travel destinations`,
+        `best places ${userMessage} ${template.name} trip`,
+      ],
+      extracted_details: {
+        primary_interest: template.name,
+        geographic_focus: undefined,
+        specific_requirements: [],
+      },
+      constraints: {
+        geographic_region: undefined,
+        thematic_focus: template.name,
+        suggested_num_destinations: 3,
+        reasoning: 'Default fallback',
+      },
+      raw_interpretation: userMessage,
+    };
   }
 
   /**
@@ -58,33 +213,43 @@ export class ResearchService {
     await this.logger.logUserProgress(this.db, tripId, 'Researching destinations...', 10);
 
     try {
-      // Step 1: Extract context using AI for template-specific placeholders
-      const context = await this.extractContextWithAI(
+      // Step 1: AI interprets user request and generates smart search queries
+      const interpretation = await this.interpretUserRequest(
         userMessage,
         template,
         preferences,
         costTracker,
         tripId
       );
-      this.logger.debug(`Extracted context: ${JSON.stringify(context)}`);
+      this.logger.info(`AI interpretation complete: ${interpretation.raw_interpretation}`);
 
-      // Step 2: Build research queries from template
-      const queries = this.templateEngine.buildResearchQueries(template, context);
-      this.logger.info(`Built ${queries.length} research queries: ${queries.join(', ')}`);
+      // Use AI-generated queries
+      const queries = interpretation.search_queries;
 
       if (queries.length === 0) {
-        throw new Error('No research queries configured in template');
+        throw new Error('AI failed to generate search queries');
       }
 
-      // Log the actual queries being executed
+      // Log the AI interpretation and queries
       await this.logger.logTelemetry(this.db, tripId, 'search_queries', {
         details: {
           queries: queries,
-          extracted_context: context,
+          interpretation: interpretation.extracted_details,
+          constraints: interpretation.constraints,
         },
       });
 
       await this.logger.logUserProgress(this.db, tripId, 'Searching the web for destinations...', 30);
+
+      // Build context for compatibility with existing synthesis methods
+      const context: any = {
+        ...preferences,
+        ...interpretation.extracted_details,
+        geographic_focus: interpretation.constraints.geographic_region,
+        thematic_focus: interpretation.constraints.thematic_focus,
+        suggested_num_destinations: interpretation.constraints.suggested_num_destinations,
+        topic: userMessage,
+      };
 
       // Step 3: Perform web searches
       const searchResults = await this.searchClient.searchMultiple(queries, 5, costTracker);
@@ -98,12 +263,17 @@ export class ResearchService {
         },
       });
 
+      await this.logger.logUserProgress(this.db, tripId, 'Extracting detailed content...', 40);
+
+      // Step 3b: Enrich top search results with Firecrawl
+      const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId);
+
       await this.logger.logUserProgress(this.db, tripId, 'Analyzing results...', 50);
 
       // Step 4: Generate and store research summary
       const researchSummary = await this.generateResearchSummary(
         queries,
-        searchResults,
+        enrichedResults,
         template,
         context,
         costTracker,
@@ -113,11 +283,11 @@ export class ResearchService {
 
       await this.logger.logUserProgress(this.db, tripId, 'Identifying destinations...', 60);
 
-      // Step 5: Synthesize results with AI
+      // Step 5: Synthesize results with AI (using enriched content)
       const destinations = await this.synthesizeDestinations(
         template,
         context,
-        searchResults,
+        enrichedResults,
         costTracker,
         tripId
       );
@@ -156,7 +326,7 @@ export class ResearchService {
   private async synthesizeDestinations(
     template: TripTemplate,
     context: any,
-    searchResults: SearchResponse[],
+    enrichedResults: EnrichedSearchResult[],
     costTracker: CostTracker,
     tripId: string
   ): Promise<Destination[]> {
@@ -164,25 +334,35 @@ export class ResearchService {
     const synthesisPrompt = this.templateEngine.buildResearchSynthesis(template, context);
     const criteriaPrompt = this.templateEngine.buildDestinationCriteria(template, context);
 
-    // Concatenate search results into context
+    // Concatenate search results into context (including enriched content)
     let searchContext = 'Web search results:\n\n';
-    searchResults.forEach((response, index) => {
+    enrichedResults.forEach((response, index) => {
       searchContext += `Query ${index + 1}: "${response.query}"\n`;
       response.results.forEach((result, resultIndex) => {
-        searchContext += `${resultIndex + 1}. ${result.title}\n   ${result.snippet}\n   ${result.url}\n\n`;
+        searchContext += `${resultIndex + 1}. ${result.title}\n`;
+        searchContext += `   Summary: ${result.snippet}\n`;
+        if (result.enrichedContent) {
+          searchContext += `   Full content:\n   ${result.enrichedContent.substring(0, 1500)}\n`;
+        }
+        searchContext += `   Source: ${result.url}\n\n`;
       });
       searchContext += '\n';
     });
 
-    // Build geographic constraint if region was extracted
+    // Build geographic constraint from any location-related field
+    const geoFocus = context.geographic_focus || context.region || context.destination || context.location;
     let regionConstraint = '';
-    if (context.region) {
-      regionConstraint = `\nCRITICAL GEOGRAPHIC CONSTRAINT: All destinations MUST be located in or near "${context.region}". Do NOT suggest locations in other countries or regions. The user specifically wants to travel to ${context.region}.\n`;
+    if (geoFocus) {
+      regionConstraint = `\nCRITICAL GEOGRAPHIC CONSTRAINT: All destinations MUST be located in or near "${geoFocus}". Do NOT suggest locations in other countries or regions. The user specifically wants to travel to ${geoFocus}.\n`;
     }
 
-    // Build user context summary
+    // Determine number of destinations
+    const numDestinations = context.suggested_num_destinations || 3;
+
+    // Build user context summary (filter out internal fields)
+    const systemFields = ['departure_airport', 'luxury_level', 'activity_level', 'duration', 'travelers_adults', 'travelers_children', 'suggested_num_destinations'];
     const userContextSummary = Object.entries(context)
-      .filter(([key, value]) => value && !['departure_airport', 'luxury_level', 'activity_level'].includes(key))
+      .filter(([key, value]) => value && !systemFields.includes(key))
       .map(([key, value]) => `- ${key}: ${value}`)
       .join('\n');
 
@@ -197,7 +377,7 @@ ${userContextSummary}
 ${searchContext}
 
 IMPORTANT: Your response must be ONLY a valid JSON array of destinations. No additional text or explanation.
-${context.region ? `All destinations MUST be in ${context.region} - do not suggest US or other country locations.` : ''}
+${geoFocus ? `All destinations MUST be in ${geoFocus} - do not suggest locations in other countries or regions.` : ''}
 
 Format:
 [
@@ -211,20 +391,32 @@ Format:
   }
 ]
 
-Generate 2-4 destinations that match the user's request.`;
+Generate exactly ${numDestinations} destinations that match the user's request.`;
 
     this.logger.info(`Synthesis prompt context: ${JSON.stringify(context)}`);
+
+    // Use the geographic focus we already determined
+    const geographicFocus = geoFocus ? `Focus exclusively on destinations in ${geoFocus}.` : '';
 
     // Call AI
     const aiResponse = await this.aiProvider.generate(
       {
         prompt: fullPrompt,
-        systemPrompt: `You are a ${template.name} travel research assistant. Respond ONLY with valid JSON arrays, no additional text. ${context.region ? `Focus exclusively on destinations in ${context.region}.` : ''}`,
+        systemPrompt: `You are a ${template.name} travel research assistant. Respond ONLY with valid JSON arrays, no additional text. ${geographicFocus}`,
         maxTokens: 2000,
         temperature: 0.7,
       },
       costTracker
     );
+
+    // Log extracted context dynamically (filter out system fields)
+    const extractedContextForLog: Record<string, any> = {};
+    const logSystemFields = ['departure_airport', 'luxury_level', 'activity_level', 'duration', 'travelers_adults', 'travelers_children', 'departure_date', 'suggested_num_destinations', 'topic'];
+    Object.keys(context).forEach(key => {
+      if (!logSystemFields.includes(key) && context[key]) {
+        extractedContextForLog[key] = context[key];
+      }
+    });
 
     await this.logger.logTelemetry(this.db, tripId, 'destination_synthesis', {
       provider: aiResponse.provider,
@@ -232,9 +424,10 @@ Generate 2-4 destinations that match the user's request.`;
       tokens: aiResponse.totalTokens,
       cost: aiResponse.cost,
       details: {
-        region: context.region || 'not specified',
-        surname: context.surname || 'not specified',
-        search_results_count: searchResults.reduce((sum, r) => sum + r.results.length, 0),
+        extracted_context: extractedContextForLog,
+        geographic_focus: geoFocus || 'none',
+        num_destinations_requested: numDestinations,
+        search_results_count: enrichedResults.reduce((sum, r) => sum + r.results.length, 0),
       },
     });
 
@@ -310,7 +503,7 @@ Generate a friendly, conversational message presenting these destinations to the
    */
   private async generateResearchSummary(
     queries: string[],
-    searchResults: SearchResponse[],
+    enrichedResults: EnrichedSearchResult[],
     _template: TripTemplate,
     context: any,
     costTracker: CostTracker,
@@ -318,7 +511,7 @@ Generate a friendly, conversational message presenting these destinations to the
   ): Promise<ResearchSummary> {
     // Extract unique sources from search results
     const sourcesMap = new Map<string, { title: string; url: string }>();
-    searchResults.forEach((response) => {
+    enrichedResults.forEach((response) => {
       response.results.forEach((result) => {
         if (!sourcesMap.has(result.url)) {
           sourcesMap.set(result.url, { title: result.title, url: result.url });
@@ -327,9 +520,14 @@ Generate a friendly, conversational message presenting these destinations to the
     });
     const sources = Array.from(sourcesMap.values()).slice(0, 8); // Top 8 sources
 
-    // Build summary prompt
-    const searchContext = searchResults.map((response) => {
-      return response.results.map((r) => `- ${r.title}: ${r.snippet}`).join('\n');
+    // Build summary prompt (use enriched content when available)
+    const searchContext = enrichedResults.map((response) => {
+      return response.results.map((r) => {
+        if (r.enrichedContent) {
+          return `- ${r.title}:\n  ${r.enrichedContent.substring(0, 500)}`;
+        }
+        return `- ${r.title}: ${r.snippet}`;
+      }).join('\n');
     }).join('\n\n');
 
     // Get theme name for context
@@ -388,7 +586,8 @@ Be specific with place names and facts. This summary helps the traveler understa
     tripId: string
   ): Promise<any> {
     // Start with basic regex extraction for backward compatibility
-    const baseContext = this.templateEngine.extractContext(userMessage, preferences);
+    // Pass template so extraction only happens for placeholders the template actually uses
+    const baseContext = this.templateEngine.extractContext(userMessage, preferences, template);
 
     // Get template-specific placeholders
     const placeholders = this.templateEngine.extractPlaceholders(template);
@@ -456,6 +655,83 @@ Be specific with place names and facts. This summary helps the traveler understa
       ...baseContext,
       topic: userMessage,
     };
+  }
+
+  /**
+   * Enrich search results by scraping top URLs with Firecrawl
+   * Takes top 2 URLs per query and extracts full content
+   */
+  private async enrichSearchResults(
+    searchResults: SearchResponse[],
+    costTracker: CostTracker,
+    tripId: string
+  ): Promise<EnrichedSearchResult[]> {
+    if (!this.firecrawlClient) {
+      this.logger.debug('Firecrawl not available, using search snippets only');
+      return searchResults.map(r => ({
+        query: r.query,
+        results: r.results.map(result => ({
+          title: result.title,
+          url: result.url,
+          snippet: result.snippet,
+        })),
+      }));
+    }
+
+    const urlsToScrape: string[] = [];
+    const urlToQueryMap = new Map<string, number>();
+
+    // Collect top 2 URLs per query
+    searchResults.forEach((response, queryIndex) => {
+      response.results.slice(0, 2).forEach(result => {
+        if (!urlsToScrape.includes(result.url)) {
+          urlsToScrape.push(result.url);
+          urlToQueryMap.set(result.url, queryIndex);
+        }
+      });
+    });
+
+    this.logger.info(`Enriching ${urlsToScrape.length} URLs with Firecrawl...`);
+
+    // Scrape URLs in parallel (with concurrency limit and telemetry)
+    const scrapeResults = await this.firecrawlClient.scrapeMultiple(
+      urlsToScrape,
+      { formats: ['markdown'], onlyMainContent: true },
+      costTracker,
+      3,  // Concurrency limit
+      { db: this.db, tripId }  // Telemetry context
+    );
+
+    // Build map of URL to scraped content
+    const contentMap = new Map<string, string>();
+    scrapeResults.forEach(result => {
+      if (result.success && result.markdown) {
+        const summary = FirecrawlClient.extractSummary(result.markdown, 2000);
+        contentMap.set(result.url, summary);
+      }
+    });
+
+    // Log enrichment results
+    const successCount = scrapeResults.filter(r => r.success).length;
+    await this.logger.logTelemetry(this.db, tripId, 'content_enrichment', {
+      provider: 'Firecrawl',
+      details: {
+        urls_scraped: urlsToScrape.length,
+        successful: successCount,
+        failed: urlsToScrape.length - successCount,
+      },
+    });
+
+    // Build enriched results
+    return searchResults.map(response => ({
+      query: response.query,
+      results: response.results.map(result => ({
+        title: result.title,
+        url: result.url,
+        snippet: result.snippet,
+        enrichedContent: contentMap.get(result.url),
+      })),
+    }));
   }
 
   /**
