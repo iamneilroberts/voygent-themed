@@ -1,0 +1,375 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://voygent.app/schemas/test-report.json",
+  "title": "Test Report Schema",
+  "description": "Schema for E2E test execution reports including results, performance metrics, and cost tracking",
+  "type": "object",
+  "required": ["id", "startedAt", "finishedAt", "environment", "summary", "suiteResults"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^report-\\d{4}-\\d{2}-\\d{2}-\\d{6}$",
+      "description": "Unique report identifier (format: report-YYYY-MM-DD-HHMMSS)",
+      "examples": ["report-2025-10-09-101530"]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Test run start time (ISO 8601)"
+    },
+    "finishedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Test run finish time (ISO 8601)"
+    },
+    "duration": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in milliseconds"
+    },
+    "environment": {
+      "type": "object",
+      "required": ["name", "appUrl", "nodeVersion", "playwrightVersion"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["local", "staging", "production"]
+        },
+        "appUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "nodeVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "playwrightVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "ciEnvironment": {
+          "type": ["string", "null"],
+          "description": "CI platform name (e.g., 'GitHub Actions', 'GitLab CI')"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "skipped", "flaky", "passRate"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of tests"
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of passed tests"
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of failed tests"
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of skipped tests"
+        },
+        "flaky": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tests that passed after retry"
+        },
+        "passRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of tests passed"
+        }
+      }
+    },
+    "suiteResults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["suiteName", "priority", "passed", "failed", "skipped", "duration", "passRate"],
+        "properties": {
+          "suiteName": {
+            "type": "string",
+            "description": "Test suite name"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["P1", "P2", "P3"]
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Suite execution time in milliseconds"
+          },
+          "passRate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      }
+    },
+    "flakinessRate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Percentage of flaky tests (target: <5%)"
+    },
+    "performanceMetrics": {
+      "type": "object",
+      "description": "Aggregated performance metrics (informational only)",
+      "properties": {
+        "avgDestinationResearchTime": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Average Phase 1 time in milliseconds"
+        },
+        "p95DestinationResearchTime": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "95th percentile Phase 1 time in milliseconds"
+        },
+        "avgTripBuildingTime": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Average Phase 2 time in milliseconds"
+        },
+        "p95TripBuildingTime": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "95th percentile Phase 2 time in milliseconds"
+        },
+        "totalApiCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of external API calls"
+        },
+        "avgApiResponseTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average API response time in milliseconds"
+        }
+      }
+    },
+    "costTracking": {
+      "type": "object",
+      "description": "Cost tracking (informational only, does not affect test results)",
+      "required": ["totalCost", "costByProvider"],
+      "properties": {
+        "totalCost": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total estimated cost in USD"
+        },
+        "costByProvider": {
+          "type": "object",
+          "properties": {
+            "amadeus": {
+              "type": "number",
+              "minimum": 0
+            },
+            "viator": {
+              "type": "number",
+              "minimum": 0
+            },
+            "serper": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tavily": {
+              "type": "number",
+              "minimum": 0
+            },
+            "zai": {
+              "type": "number",
+              "minimum": 0
+            },
+            "openrouter": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "costByTest": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Map of test ID to cost in USD"
+        },
+        "avgCostPerTrip": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average AI cost per tested trip (target: <$0.50)"
+        }
+      }
+    },
+    "productionReadiness": {
+      "type": "object",
+      "description": "Production readiness assessment based on success criteria",
+      "required": ["isReady", "criteria"],
+      "properties": {
+        "isReady": {
+          "type": "boolean",
+          "description": "Whether this build meets production readiness criteria"
+        },
+        "criteria": {
+          "type": "object",
+          "required": ["p1PassRate", "p2PassRate", "flakinessRate"],
+          "properties": {
+            "p1PassRate": {
+              "type": "object",
+              "required": ["value", "target", "met"],
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "target": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "default": 100
+                },
+                "met": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "p2PassRate": {
+              "type": "object",
+              "required": ["value", "target", "met"],
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "target": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "default": 95
+                },
+                "met": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "flakinessRate": {
+              "type": "object",
+              "required": ["value", "target", "met"],
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "target": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "default": 5
+                },
+                "met": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "Explanation of production readiness decision"
+        }
+      }
+    },
+    "testResults": {
+      "type": "array",
+      "description": "Individual test results (optional, may be in separate file)",
+      "items": {
+        "type": "object",
+        "required": ["testId", "status", "duration"],
+        "properties": {
+          "testId": {
+            "type": "string",
+            "description": "Unique test identifier (format: '{suite} > {title}')"
+          },
+          "title": {
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string",
+            "description": "Test file path"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped", "timedout"]
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Test execution time in milliseconds"
+          },
+          "retryCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of retries"
+          },
+          "error": {
+            "type": ["object", "null"],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "stack": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["assertion", "timeout", "api", "network", "unknown"]
+              }
+            }
+          },
+          "screenshots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

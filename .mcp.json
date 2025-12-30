@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "d1-database": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://d1-database-improved.somotravel.workers.dev/sse"
+      ]
+    },
+    "github-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://github-mcp-cta.somotravel.workers.dev/sse"
+      ]
+    },
+    "prompt-instructions-d1": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://prompt-instructions-d1-mcp.somotravel.workers.dev/sse"
+      ]
+    },
+    "template-document": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://template-document-mcp.somotravel.workers.dev/sse"
+      ]
+    }
+  }
+}

@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://voygent.app/schemas/test-config.json",
+  "title": "Test Configuration Schema",
+  "description": "Schema for E2E test configuration including environment, API keys, and test execution settings",
+  "type": "object",
+  "required": ["environment", "appUrl", "apiKeys", "testSettings"],
+  "properties": {
+    "environment": {
+      "type": "string",
+      "enum": ["local", "staging", "production"],
+      "description": "Test environment name"
+    },
+    "appUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Base URL for the application under test",
+      "examples": [
+        "http://localhost:8788",
+        "https://staging.voygent.app",
+        "https://voygent.app"
+      ]
+    },
+    "databaseUrl": {
+      "type": "string",
+      "description": "Database connection string (D1 local file path or connection string)"
+    },
+    "apiKeys": {
+      "type": "object",
+      "required": ["amadeus", "amadeusSecret", "viator", "serper", "openrouter"],
+      "properties": {
+        "amadeus": {
+          "type": "string",
+          "description": "Amadeus API key for flight/hotel search"
+        },
+        "amadeusSecret": {
+          "type": "string",
+          "description": "Amadeus API secret for authentication"
+        },
+        "viator": {
+          "type": "string",
+          "description": "Viator API key for tour/activity search"
+        },
+        "serper": {
+          "type": "string",
+          "description": "Serper API key for web search"
+        },
+        "tavily": {
+          "type": "string",
+          "description": "Tavily API key for web search (fallback)"
+        },
+        "zai": {
+          "type": "string",
+          "description": "Z.AI API key for AI generation"
+        },
+        "openrouter": {
+          "type": "string",
+          "description": "OpenRouter API key for AI generation (fallback)"
+        }
+      }
+    },
+    "testSettings": {
+      "type": "object",
+      "required": ["timeout", "retries", "workers"],
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "minimum": 60000,
+          "maximum": 600000,
+          "default": 120000,
+          "description": "Default test timeout in milliseconds (1-10 minutes)"
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 2,
+          "description": "Number of retry attempts for failed tests"
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 4,
+          "description": "Number of parallel workers for test execution"
+        },
+        "fullyParallel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to run all tests in parallel across workers"
+        },
+        "forbidOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fail if test.only() is used (should be true in CI)"
+        }
+      }
+    },
+    "performanceThresholds": {
+      "type": "object",
+      "description": "Performance thresholds (informational only, do not fail tests)",
+      "properties": {
+        "destinationResearchMax": {
+          "type": "integer",
+          "default": 60000,
+          "description": "Target time for destination research in milliseconds (Phase 1)"
+        },
+        "tripBuildingMax": {
+          "type": "integer",
+          "default": 180000,
+          "description": "Target time for trip building in milliseconds (Phase 2)"
+        },
+        "totalSuiteMax": {
+          "type": "integer",
+          "default": 600000,
+          "description": "Target time for entire test suite in milliseconds (10 minutes)"
+        }
+      }
+    },
+    "costThresholds": {
+      "type": "object",
+      "description": "Cost thresholds (informational only, do not fail tests)",
+      "properties": {
+        "perTripMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.50,
+          "description": "Target average AI cost per trip in USD"
+        },
+        "dailyMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 10.0,
+          "description": "Expected daily test execution cost in USD"
+        }
+      }
+    },
+    "successCriteria": {
+      "type": "object",
+      "required": ["p1PassRate", "p2PassRate", "maxFlakinessRate"],
+      "properties": {
+        "p1PassRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 100,
+          "description": "Required pass rate for P1 tests (percent)"
+        },
+        "p2PassRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 95,
+          "description": "Required pass rate for P2 tests (percent)"
+        },
+        "maxFlakinessRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 5,
+          "description": "Maximum acceptable flakiness rate (percent)"
+        }
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "description": "Test fixture configuration",
+      "properties": {
+        "templates": {
+          "type": "object",
+          "description": "Template IDs for this environment",
+          "properties": {
+            "heritageAncestry": {
+              "type": "string",
+              "description": "Heritage & Ancestry template ID"
+            },
+            "culinaryAdventure": {
+              "type": "string",
+              "description": "Culinary Adventure template ID"
+            }
+          }
+        },
+        "defaultPreferences": {
+          "type": "object",
+          "description": "Default preferences for test fixtures",
+          "properties": {
+            "duration_min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 7
+            },
+            "duration_max": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 14
+            },
+            "departure_airport": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$",
+              "default": "JFK",
+              "description": "IATA airport code (3 letters)"
+            },
+            "travelers": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 2
+            },
+            "luxury_level": {
+              "type": "string",
+              "enum": ["budget", "moderate", "luxury"],
+              "default": "moderate"
+            }
+          }
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "description": "Test reporting configuration",
+      "properties": {
+        "outputDir": {
+          "type": "string",
+          "default": "test-results",
+          "description": "Directory for test results and reports"
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["html", "json", "junit", "list"]
+          },
+          "default": ["html", "json", "list"],
+          "description": "Report formats to generate"
+        },
+        "screenshots": {
+          "type": "string",
+          "enum": ["on", "off", "only-on-failure"],
+          "default": "only-on-failure",
+          "description": "When to capture screenshots"
+        },
+        "trace": {
+          "type": "string",
+          "enum": ["on", "off", "retain-on-failure", "on-first-retry"],
+          "default": "on-first-retry",
+          "description": "When to capture Playwright traces"
+        }
+      }
+    }
+  }
+}

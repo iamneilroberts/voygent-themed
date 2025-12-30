@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: VoyGent V3 Templates API
+  description: API for retrieving trip templates (Heritage, Wine & Food, Film Locations, etc.)
+  version: 1.0.0
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /templates:
+    get:
+      summary: List featured templates
+      description: |
+        Returns list of featured trip templates for homepage display.
+        Templates with featured=1 and is_active=1 are returned.
+      operationId: listTemplates
+      tags:
+        - Templates
+      responses:
+        '200':
+          description: List of featured templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TemplateCard'
+
+  /templates/{template_id}:
+    get:
+      summary: Get template details
+      description: |
+        Returns complete template configuration including all prompts,
+        constraints, and UI text for trip planning.
+      operationId: getTemplate
+      tags:
+        - Templates
+      parameters:
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: heritage-001
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: Template not found
+
+components:
+  schemas:
+    TemplateCard:
+      type: object
+      description: Minimal template info for homepage cards
+      properties:
+        id:
+          type: string
+          example: heritage-001
+        name:
+          type: string
+          example: "Heritage & Ancestry"
+        description:
+          type: string
+          example: "Trace your family roots..."
+        icon:
+          type: string
+          example: "🌳"
+        search_placeholder:
+          type: string
+          example: "E.g., Sullivan family from Cork, Ireland"
+
+    Template:
+      type: object
+      description: Complete template configuration
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        search_placeholder:
+          type: string
+        search_help_text:
+          type: string
+        number_of_options:
+          type: integer
+        trip_days_min:
+          type: integer
+        trip_days_max:
+          type: integer
+        luxury_levels:
+          type: array
+          items:
+            type: string
+        activity_levels:
+          type: array
+          items:
+            type: string
+        required_fields:
+          type: array
+          items:
+            type: string
+        optional_fields:
+          type: array
+          items:
+            type: string
+        example_inputs:
+          type: array
+          items:
+            type: string

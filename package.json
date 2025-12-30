@@ -1,0 +1,48 @@
+{
+  "name": "voygent-v3",
+  "version": "1.0.0",
+  "description": "VoyGent V3 - Template-driven conversational trip planner",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public --binding DB=voygent-v3-dev",
+    "build": "tsc",
+    "deploy": "wrangler pages deploy public",
+    "db:create": "wrangler d1 create voygent-v3-dev",
+    "db:migrate": "wrangler d1 migrations apply voygent-v3-dev --local",
+    "db:migrate:prod": "wrangler d1 migrations apply voygent-themed",
+    "db:seed": "wrangler d1 execute voygent-v3-dev --file=db/seeds/0001_seed_templates.sql --local",
+    "db:seed:prod": "wrangler d1 execute voygent-themed --file=db/seeds/0001_seed_templates.sql",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:health-check": "node tests/scripts/health-check.js",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "travel",
+    "trip-planner",
+    "ai",
+    "cloudflare"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "@faker-js/faker": "^8.3.1",
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "dotenv": "^16.3.1",
+    "fishery": "^2.2.2",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4",
+    "wrangler": "^3.78.12"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  }
+}

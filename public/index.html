@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoyGent - Themed Trip Planning</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>🌍 VoyGent</h1>
+      <p class="tagline">Plan your perfect themed adventure</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <section class="hero">
+        <h2>Choose Your Travel Theme</h2>
+        <p>Tell us what interests you, and we'll help plan the perfect trip</p>
+      </section>
+
+      <section class="templates-grid" id="templatesGrid">
+        <div class="loading">Loading trip themes...</div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Trip Intake Modal -->
+  <div id="intakeModal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <button class="modal-close" aria-label="Close">&times;</button>
+
+      <div class="modal-header">
+        <span class="modal-icon" id="modalIcon"></span>
+        <h2 id="modalTitle">Plan Your Trip</h2>
+      </div>
+
+      <form id="intakeForm">
+        <!-- Theme-specific question -->
+        <div class="form-section">
+          <label for="mainQuery" id="mainQueryLabel">Tell us about your trip:</label>
+          <p class="help-text" id="mainQueryHelp"></p>
+          <textarea
+            id="mainQuery"
+            name="mainQuery"
+            rows="3"
+            required
+            placeholder=""></textarea>
+        </div>
+
+        <!-- Required fields -->
+        <div class="form-section" id="requiredFields">
+          <h3>Trip Details</h3>
+          <div class="form-grid" id="requiredFieldsGrid"></div>
+        </div>
+
+        <!-- Optional fields (collapsible) -->
+        <details class="form-section" id="optionalFields">
+          <summary>Additional Preferences (Optional)</summary>
+          <div class="form-grid" id="optionalFieldsGrid"></div>
+        </details>
+
+        <!-- Submit -->
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <span class="btn-text">Start Planning</span>
+            <span class="btn-loading hidden">Planning...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 VoyGent. Template-driven conversational trip planner.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api-client.js"></script>
+  <script src="/js/intake-form.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

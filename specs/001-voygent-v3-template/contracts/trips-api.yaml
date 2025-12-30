@@ -1,0 +1,574 @@
+openapi: 3.0.3
+info:
+  title: VoyGent V3 Trips API
+  description: API for managing themed trip planning sessions with two-phase conversational workflow
+  version: 1.0.0
+  contact:
+    name: VoyGent API Support
+
+servers:
+  - url: https://voygent.app/api
+    description: Production
+  - url: http://localhost:8788/api
+    description: Local development
+
+paths:
+  /trips:
+    post:
+      summary: Create new trip planning session
+      description: |
+        Creates a new trip based on a selected template and stores initial user message.
+        Returns trip ID for subsequent chat interactions.
+      operationId: createTrip
+      tags:
+        - Trips
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - template_id
+                - initial_message
+              properties:
+                template_id:
+                  type: string
+                  example: heritage-001
+                  description: ID of the trip template (Heritage, Wine & Food, etc.)
+                initial_message:
+                  type: string
+                  example: "Sullivan family from Cork, Ireland"
+                  description: User's initial trip request in natural language
+                preferences:
+                  type: object
+                  description: Optional trip preferences (can be set later)
+                  properties:
+                    duration:
+                      type: string
+                      example: "7-10 days"
+                    travelers_adults:
+                      type: integer
+                      example: 2
+                    travelers_children:
+                      type: integer
+                      example: 0
+                    luxury_level:
+                      type: string
+                      enum: [Budget, Comfort, Luxury]
+                      example: Comfort
+                    activity_level:
+                      type: string
+                      enum: [Relaxed, Moderate, Active]
+                      example: Moderate
+                    departure_airport:
+                      type: string
+                      example: JFK
+      responses:
+        '201':
+          description: Trip created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trip_id:
+                    type: string
+                    format: uuid
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  status:
+                    type: string
+                    example: researching
+                  progress_message:
+                    type: string
+                    example: "Researching heritage destinations..."
+        '400':
+          description: Invalid template_id or missing required fields
+        '500':
+          description: Server error
+
+  /trips/{trip_id}:
+    get:
+      summary: Get trip state
+      description: |
+        Returns current trip state including status, progress, and available data.
+        Used for progress polling during Phase 1 (research) and Phase 2 (trip building).
+      operationId: getTripState
+      tags:
+        - Trips
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Trip state retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripState'
+        '404':
+          description: Trip not found
+
+  /trips/{trip_id}/chat:
+    post:
+      summary: Send chat message
+      description: |
+        Send user message and receive AI response. Handles destination confirmation,
+        refinement requests, and general conversation. Returns streaming response for
+        real-time AI text generation.
+      operationId: sendChatMessage
+      tags:
+        - Chat
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  example: "Yes, all three sound perfect. Can we add Dublin?"
+      responses:
+        '200':
+          description: AI response (may be streaming)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                    example: "Great! I'll add Dublin to your itinerary..."
+                  status:
+                    type: string
+                    example: awaiting_confirmation
+                  updated_destinations:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Cork", "Kinsale", "Dublin"]
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream for incremental AI response
+        '400':
+          description: Empty message or invalid format
+        '404':
+          description: Trip not found
+
+  /trips/{trip_id}/confirm-destinations:
+    post:
+      summary: Confirm destinations and trigger Phase 2
+      description: |
+        User confirms final destination list. Sets destinations_confirmed=true
+        and triggers Phase 2 (trip building with booking APIs). This is the
+        critical phase gate enforced by Constitution principle II.
+      operationId: confirmDestinations
+      tags:
+        - Trips
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - confirmed_destinations
+              properties:
+                confirmed_destinations:
+                  type: array
+                  items:
+                    type: string
+                  example: ["Cork", "Kinsale", "Killarney"]
+                  minItems: 1
+                preferences:
+                  type: object
+                  description: Final trip preferences for Phase 2
+                  properties:
+                    duration:
+                      type: string
+                    departure_date:
+                      type: string
+                      format: date
+      responses:
+        '200':
+          description: Destinations confirmed, Phase 2 started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: building_trip
+                  progress_message:
+                    type: string
+                    example: "Finding flights from JFK to Cork..."
+                  estimated_completion:
+                    type: integer
+                    description: Estimated seconds until trip options ready
+                    example: 120
+        '400':
+          description: Empty destinations list or already confirmed
+        '404':
+          description: Trip not found
+
+  /trips/{trip_id}/select:
+    post:
+      summary: Select trip option
+      description: |
+        User selects one of the 2-4 generated trip options. Stores selection
+        and returns detailed day-by-day itinerary.
+      operationId: selectTripOption
+      tags:
+        - Trips
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - option_index
+              properties:
+                option_index:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                  description: 1-based index matching option_index in options_json
+      responses:
+        '200':
+          description: Option selected, detailed itinerary returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selected_option:
+                    $ref: '#/components/schemas/TripOption'
+                  detailed_itinerary:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DailyItinerary'
+        '400':
+          description: Invalid option_index or options not ready
+        '404':
+          description: Trip not found
+
+  /trips/{trip_id}/handoff:
+    post:
+      summary: Generate travel agent handoff document
+      description: |
+        Creates structured handoff document with complete trip details for
+        travel agent. Marks trip as ready for agent review.
+      operationId: generateHandoff
+      tags:
+        - Handoff
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_contact:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+                      format: email
+                    phone:
+                      type: string
+                special_requests:
+                  type: string
+                  example: "Prefer hotels near city center"
+      responses:
+        '200':
+          description: Handoff document generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  handoff_id:
+                    type: string
+                  message:
+                    type: string
+                    example: "Your trip request has been sent to a travel professional..."
+                  estimated_response_time:
+                    type: string
+                    example: "24 hours"
+        '400':
+          description: Trip option not selected yet
+        '404':
+          description: Trip not found
+
+  /trips/{trip_id}/logs:
+    get:
+      summary: Stream admin diagnostic logs (admin-only)
+      description: |
+        Returns full technical telemetry including AI model names, costs, tokens,
+        API calls, timing. Only accessible when user.role='admin' AND
+        diagnostics_enabled=true (Constitution principle IV).
+      operationId: streamLogs
+      tags:
+        - Admin
+      security:
+        - adminAuth: []
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Log stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of telemetry logs
+        '403':
+          description: Forbidden (non-admin user or diagnostics disabled)
+        '404':
+          description: Trip not found
+
+components:
+  schemas:
+    TripState:
+      type: object
+      properties:
+        trip_id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+        status:
+          type: string
+          enum: [chat, researching, awaiting_confirmation, building_trip, options_ready, option_selected, handoff_sent]
+        progress_message:
+          type: string
+        progress_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        research_destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Destination'
+        destinations_confirmed:
+          type: boolean
+        confirmed_destinations:
+          type: array
+          items:
+            type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripOption'
+        selected_option_index:
+          type: integer
+          nullable: true
+        total_cost_usd:
+          type: number
+          format: float
+          nullable: true
+
+    Destination:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Cork City
+        geographic_context:
+          type: string
+          example: "Primary origin"
+        key_sites:
+          type: array
+          items:
+            type: string
+          example: ["Cork City Library archives", "St. Fin Barre's Cathedral"]
+        travel_logistics_note:
+          type: string
+          example: "International airport, walkable city center"
+        rationale:
+          type: string
+          example: "Sullivan family historical records"
+        estimated_days:
+          type: integer
+          example: 4
+
+    TripOption:
+      type: object
+      properties:
+        option_index:
+          type: integer
+          example: 1
+        total_cost_usd:
+          type: number
+          format: float
+          example: 3500.00
+        flights:
+          type: object
+          properties:
+            outbound:
+              $ref: '#/components/schemas/Flight'
+            return:
+              $ref: '#/components/schemas/Flight'
+        hotels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hotel'
+        tours:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tour'
+        itinerary_highlights:
+          type: string
+          example: "Explore Cork City archives, visit Kinsale Fort, tour Blarney Castle..."
+
+    Flight:
+      type: object
+      properties:
+        airline:
+          type: string
+          example: "Aer Lingus"
+        route:
+          type: string
+          example: "JFK → ORK"
+        departure:
+          type: string
+          format: date-time
+        arrival:
+          type: string
+          format: date-time
+
+    Hotel:
+      type: object
+      properties:
+        city:
+          type: string
+          example: Cork
+        name:
+          type: string
+          example: "Hayfield Manor"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        nights:
+          type: integer
+          example: 4
+        cost_per_night_usd:
+          type: number
+          format: float
+          example: 180.00
+
+    Tour:
+      type: object
+      properties:
+        city:
+          type: string
+          example: Cork
+        name:
+          type: string
+          example: "Heritage Walking Tour"
+        duration:
+          type: string
+          example: "3 hours"
+        cost_usd:
+          type: number
+          format: float
+          example: 45.00
+
+    DailyItinerary:
+      type: object
+      properties:
+        day:
+          type: integer
+          example: 1
+        date:
+          type: string
+          format: date
+        city:
+          type: string
+          example: Cork
+        activities:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                example: "Morning"
+              description:
+                type: string
+                example: "Visit Cork City Library for genealogy research"
+              type:
+                type: string
+                enum: [tour, meal, free time, travel]
+              cost_usd:
+                type: number
+                format: float
+                nullable: true
+        hotel:
+          type: object
+          properties:
+            name:
+              type: string
+            address:
+              type: string
+        meals_included:
+          type: array
+          items:
+            type: string
+          example: ["Breakfast"]
+        estimated_cost_usd:
+          type: number
+          format: float
+
+  securitySchemes:
+    adminAuth:
+      type: http
+      scheme: bearer
+      description: Admin JWT token for diagnostic access

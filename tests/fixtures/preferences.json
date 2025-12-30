@@ -1,0 +1,129 @@
+{
+  "preferences": {
+    "heritage": {
+      "duration": "10 days",
+      "budget": "moderate",
+      "interests": ["genealogy research", "historical sites", "traditional music", "local food"],
+      "heritage": "Irish",
+      "culture": "Celtic",
+      "travelStyle": "cultural immersion",
+      "pace": "relaxed",
+      "accommodation": "boutique hotels",
+      "transportation": "mix of public and private",
+      "specialRequests": "Access to genealogy archives and local historians"
+    },
+    "culinary": {
+      "duration": "7 days",
+      "budget": "luxury",
+      "interests": ["cooking classes", "wine tasting", "local markets", "fine dining"],
+      "cuisine": "Italian",
+      "dietaryRestrictions": "none",
+      "travelStyle": "food-focused",
+      "pace": "moderate",
+      "accommodation": "luxury hotels",
+      "transportation": "private driver",
+      "specialRequests": "Reservations at Michelin-starred restaurants"
+    },
+    "adventure": {
+      "duration": "5 days",
+      "budget": "moderate",
+      "interests": ["hiking", "kayaking", "mountain biking"],
+      "activities": ["hiking", "water sports", "cycling"],
+      "fitnessLevel": "intermediate",
+      "travelStyle": "active adventure",
+      "pace": "energetic",
+      "accommodation": "mountain lodges",
+      "transportation": "rental car",
+      "specialRequests": "Professional guide for technical trails"
+    },
+    "basic": {
+      "duration": "3 days",
+      "budget": "economy",
+      "interests": ["sightseeing", "local culture"],
+      "travelStyle": "flexible",
+      "pace": "relaxed",
+      "accommodation": "standard hotels",
+      "transportation": "public transport"
+    },
+    "luxury": {
+      "duration": "14 days",
+      "budget": "luxury",
+      "interests": ["fine dining", "spa", "exclusive experiences", "art galleries"],
+      "travelStyle": "luxury relaxation",
+      "pace": "very relaxed",
+      "accommodation": "5-star hotels and resorts",
+      "transportation": "private chauffeur",
+      "specialRequests": "VIP access and private tours"
+    },
+    "family": {
+      "duration": "10 days",
+      "budget": "moderate",
+      "interests": ["family activities", "educational experiences", "nature", "kid-friendly restaurants"],
+      "travelers": {
+        "adults": 2,
+        "children": 2,
+        "childAges": [8, 12]
+      },
+      "travelStyle": "family-friendly",
+      "pace": "relaxed with breaks",
+      "accommodation": "family suites",
+      "transportation": "rental vehicle with car seats",
+      "specialRequests": "Activities suitable for children ages 8-12"
+    }
+  },
+  "testData": {
+    "validDurations": ["3 days", "5 days", "7 days", "10 days", "14 days", "21 days"],
+    "validBudgets": ["economy", "moderate", "luxury", "ultra-luxury"],
+    "validPaces": ["very relaxed", "relaxed", "moderate", "energetic", "intensive"],
+    "validTransportation": ["public transport", "rental car", "private driver", "private chauffeur", "mix of public and private"],
+    "validAccommodation": ["hostels", "standard hotels", "boutique hotels", "luxury hotels", "5-star hotels and resorts", "vacation rentals", "mountain lodges"],
+    "commonInterests": [
+      "historical sites",
+      "museums",
+      "art galleries",
+      "local food",
+      "fine dining",
+      "cooking classes",
+      "wine tasting",
+      "hiking",
+      "water sports",
+      "cycling",
+      "shopping",
+      "nightlife",
+      "photography",
+      "architecture",
+      "nature",
+      "wildlife",
+      "beaches",
+      "mountains",
+      "cultural performances",
+      "festivals",
+      "genealogy research",
+      "spa and wellness"
+    ]
+  },
+  "edgeCases": {
+    "minimalPreferences": {
+      "duration": "3 days"
+    },
+    "maximalPreferences": {
+      "duration": "21 days",
+      "budget": "ultra-luxury",
+      "interests": ["fine dining", "spa", "exclusive experiences", "art galleries", "wine tasting", "cooking classes", "cultural performances", "private tours"],
+      "travelStyle": "ultra-luxury all-inclusive",
+      "pace": "very relaxed",
+      "accommodation": "presidential suites and private villas",
+      "transportation": "private jet and yacht",
+      "specialRequests": "24/7 personal concierge, private chef, exclusive venue access",
+      "dietaryRestrictions": "vegan, gluten-free, no shellfish",
+      "accessibilityNeeds": "wheelchair accessible",
+      "languagePreferences": ["English", "Spanish"]
+    },
+    "conflictingPreferences": {
+      "duration": "3 days",
+      "budget": "economy",
+      "interests": ["fine dining", "Michelin-starred restaurants", "luxury spa"],
+      "specialRequests": "Budget-friendly luxury experiences"
+    }
+  }
+}

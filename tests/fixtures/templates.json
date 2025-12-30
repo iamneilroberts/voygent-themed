@@ -1,0 +1,67 @@
+{
+  "templates": [
+    {
+      "id": "heritage-ancestry-001",
+      "name": "Heritage & Ancestry",
+      "description": "Explore your roots and discover your family's cultural heritage through meaningful travel experiences.",
+      "initial_message": "Welcome! I'll help you plan a meaningful heritage and ancestry trip. Let's start by understanding your family's background and the destinations you'd like to explore to connect with your roots.",
+      "research_prompt_template": "Research destinations related to {user_heritage} heritage and ancestry. Focus on locations with historical significance, cultural museums, genealogy resources, and local communities that preserve {culture_name} traditions. Provide 2-3 destination recommendations with detailed information about heritage sites, genealogy archives, and cultural experiences.",
+      "trip_building_prompt_template": "Create a detailed {duration}-day heritage and ancestry trip to {destinations} focusing on {preferences}. Include visits to genealogy centers, historical sites, cultural museums, local community events, and traditional restaurants. Ensure the itinerary allows time for personal research and reflection. Format as 3 distinct trip options varying in pace, depth of genealogical research, and cultural immersion level."
+    },
+    {
+      "id": "culinary-adventure-001",
+      "name": "Culinary Adventure",
+      "description": "Embark on a food-focused journey to discover local cuisines, cooking traditions, and authentic flavors.",
+      "initial_message": "Welcome! I'll help you plan an unforgettable culinary adventure. Let's explore your taste preferences and the food cultures you're most excited to discover.",
+      "research_prompt_template": "Research culinary destinations known for {cuisine_type} cuisine and food culture. Focus on locations with renowned restaurants, cooking classes, food markets, and authentic local dining experiences. Provide 2-3 destination recommendations with detailed information about signature dishes, notable chefs, and food festivals.",
+      "trip_building_prompt_template": "Create a detailed {duration}-day culinary adventure to {destinations} focusing on {preferences}. Include visits to local markets, cooking classes, renowned restaurants, food tours, and opportunities to meet local chefs and food artisans. Ensure the itinerary balances fine dining with authentic street food experiences. Format as 3 distinct trip options varying in cuisine focus, dining budget, and hands-on cooking opportunities."
+    },
+    {
+      "id": "adventure-outdoor-001",
+      "name": "Adventure & Outdoor",
+      "description": "Challenge yourself with thrilling outdoor activities and explore breathtaking natural landscapes.",
+      "initial_message": "Welcome! I'll help you plan an exciting adventure and outdoor trip. Let's discuss your fitness level and the types of outdoor activities that interest you most.",
+      "research_prompt_template": "Research adventure destinations ideal for {activity_types} activities. Focus on locations with diverse outdoor experiences, professional guides, quality equipment rentals, and stunning natural landscapes. Provide 2-3 destination recommendations with detailed information about adventure activities, difficulty levels, and seasonal considerations.",
+      "trip_building_prompt_template": "Create a detailed {duration}-day adventure trip to {destinations} focusing on {preferences}. Include guided outdoor activities, equipment rentals, safety briefings, and time for rest and recovery. Balance challenging activities with scenic relaxation. Format as 3 distinct trip options varying in adventure intensity, activity diversity, and physical challenge level."
+    }
+  ],
+  "testScenarios": {
+    "heritageTrip": {
+      "templateId": "heritage-ancestry-001",
+      "initialMessage": "I want to explore my Irish heritage and visit places where my ancestors lived.",
+      "userPreferences": {
+        "heritage": "Irish",
+        "culture": "Celtic",
+        "duration": "10 days",
+        "interests": ["genealogy research", "historical sites", "traditional music"],
+        "budget": "moderate"
+      },
+      "expectedDestinations": ["Dublin", "Cork", "Galway"],
+      "expectedActivities": ["genealogy center visits", "castle tours", "traditional pub experiences"]
+    },
+    "culinaryTrip": {
+      "templateId": "culinary-adventure-001",
+      "initialMessage": "I want to learn authentic Italian cooking and explore regional cuisines.",
+      "userPreferences": {
+        "cuisine": "Italian",
+        "duration": "7 days",
+        "interests": ["cooking classes", "wine tasting", "local markets"],
+        "budget": "luxury"
+      },
+      "expectedDestinations": ["Rome", "Florence", "Bologna"],
+      "expectedActivities": ["pasta making classes", "vineyard tours", "market shopping"]
+    },
+    "adventureTrip": {
+      "templateId": "adventure-outdoor-001",
+      "initialMessage": "I want an active trip with hiking, kayaking, and mountain biking.",
+      "userPreferences": {
+        "activities": ["hiking", "kayaking", "mountain biking"],
+        "duration": "5 days",
+        "fitnessLevel": "intermediate",
+        "budget": "moderate"
+      },
+      "expectedDestinations": ["Banff", "Whistler"],
+      "expectedActivities": ["mountain trails", "lake kayaking", "bike tours"]
+    }
+  }
+}

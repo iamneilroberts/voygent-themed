@@ -1,0 +1,35 @@
+name = "voygent-v3"
+compatibility_date = "2024-01-01"
+
+# Pages configuration
+pages_build_output_dir = "public"
+
+# D1 Database bindings
+# Using dev database for now (production database needs schema migration)
+[[d1_databases]]
+binding = "DB"
+database_name = "voygent-v3-dev"
+database_id = "your-d1-database-id-here"
+
+# Production database (needs schema migration before use)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "voygent-themed"
+# database_id = "your-production-d1-database-id-here"
+
+# Environment variables
+# WARNING: These are plain text and will be visible in the deployment
+# For production, use Cloudflare dashboard Secrets instead
+[vars]
+SERPER_API_KEY = "your_serper_api_key_here"
+OPENROUTER_API_KEY = "your_openrouter_api_key_here"
+Z_AI_API_KEY = "your_zai_api_key_here"
+AMADEUS_API_KEY = "your_amadeus_api_key_here"
+AMADEUS_API_SECRET = "your_amadeus_api_secret_here"
+
+# [build]
+# command = "npm run build"
+# Commented out for E2E testing - functions will be loaded directly
+
+[dev]
+port = 8788
