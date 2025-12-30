@@ -681,15 +681,34 @@ Be specific with place names and facts. This summary helps the traveler understa
     const urlsToScrape: string[] = [];
     const urlToQueryMap = new Map<string, number>();
 
-    // Collect top 2 URLs per query
+    // OPTIMIZATION: Limit to 3 URLs total (down from 2 per query = ~6 total)
+    // This reduces Firecrawl scraping time significantly
+    const MAX_URLS_TO_SCRAPE = 3;
+
+    // Collect top 1 URL per query, then fill remaining slots
     searchResults.forEach((response, queryIndex) => {
-      response.results.slice(0, 2).forEach(result => {
+      if (urlsToScrape.length < MAX_URLS_TO_SCRAPE && response.results.length > 0) {
+        const result = response.results[0];
         if (!urlsToScrape.includes(result.url)) {
           urlsToScrape.push(result.url);
           urlToQueryMap.set(result.url, queryIndex);
         }
-      });
+      }
     });
+
+    // Fill remaining slots with second results from queries
+    if (urlsToScrape.length < MAX_URLS_TO_SCRAPE) {
+      searchResults.forEach((response, queryIndex) => {
+        if (urlsToScrape.length >= MAX_URLS_TO_SCRAPE) return;
+        if (response.results.length > 1) {
+          const result = response.results[1];
+          if (!urlsToScrape.includes(result.url)) {
+            urlsToScrape.push(result.url);
+            urlToQueryMap.set(result.url, queryIndex);
+          }
+        }
+      });
+    }
 
     this.logger.info(`Enriching ${urlsToScrape.length} URLs with Firecrawl...`);
 
