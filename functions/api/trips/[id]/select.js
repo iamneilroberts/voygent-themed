@@ -1,10 +1,12 @@
 /**
  * POST /api/trips/:id/select
  * Select a trip option from the generated options
+ * Generates transportation recommendations based on user preferences
  */
 import { createDatabaseClient } from '../../../lib/db';
 import { createLogger } from '../../../lib/logger';
 import { createPhaseGate } from '../../../lib/phase-gate';
+import { createTransportationService } from '../../../services/transportation-service';
 export async function onRequestPost(context) {
     const logger = createLogger();
     const db = createDatabaseClient(context.env);
@@ -48,12 +50,35 @@ export async function onRequestPost(context) {
         // Select the option
         await db.selectTripOption(tripId, body.option_index);
         logger.info(`Option ${body.option_index} selected for trip ${tripId}`);
+        // Get preferences and destinations for transportation recommendation
+        const preferences = trip.preferences_json ? JSON.parse(trip.preferences_json) : {};
+        const destinations = trip.confirmed_destinations ? JSON.parse(trip.confirmed_destinations) : [];
+        // Generate transportation recommendations
+        let transportationRecommendation = null;
+        try {
+            const transportService = createTransportationService(context.env, db, logger);
+            transportationRecommendation = await transportService.generateRecommendation({
+                tripId,
+                selectedOption,
+                destinations,
+                preferences,
+            });
+            // Update option with transportation recommendation
+            selectedOption.transportation = transportationRecommendation;
+            // Save updated options back to database
+            const updatedOptions = options.map(o => o.option_index === body.option_index ? selectedOption : o);
+            await db.updateTripOptions(tripId, updatedOptions);
+            logger.info(`Transportation recommendation generated: ${transportationRecommendation.primary_mode}`);
+        }
+        catch (error) {
+            logger.warn(`Transportation recommendation failed, continuing without it: ${error}`);
+        }
         // Return selected option and detailed itinerary
-        // Note: In full implementation, generate detailed day-by-day itinerary
         const detailedItinerary = generateDetailedItinerary(selectedOption);
         return new Response(JSON.stringify({
             selected_option: selectedOption,
             detailed_itinerary: detailedItinerary,
+            transportation: transportationRecommendation,
         }), {
             status: 200,
             headers: {

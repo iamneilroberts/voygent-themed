@@ -6,7 +6,6 @@
 
 import { Env, createDatabaseClient, ChatMessage, Destination } from '../../../lib/db';
 import { createLogger } from '../../../lib/logger';
-import { createResearchService } from '../../../services/research-service';
 import { createAIProviderManager } from '../../../lib/ai-providers';
 import { createCostTracker } from '../../../lib/cost-tracker';
 
@@ -81,18 +80,12 @@ export async function onRequestPost(context: { request: Request; env: Env; param
     let updatedDestinations: Destination[] | undefined;
 
     if (trip.status === 'researching') {
-      // User provided initial context - trigger destination research
-      const researchService = createResearchService(context.env, db, logger);
-      const result = await researchService.researchDestinations({
-        tripId: tripId,
-        userMessage: body.message,
-        template: template,
-        preferences: {}
-      });
+      // Research is already in progress (started via waitUntil in trip creation)
+      // Don't start another research - just inform user that it's in progress
+      // The frontend will poll for status updates
+      logger.info(`Trip ${tripId} is already researching - returning progress message`);
 
-      aiResponse = result.aiResponse;
-
-      logger.info(`✓ Destination research completed for trip ${tripId} - ${result.destinations.length} destinations found`);
+      aiResponse = trip.progress_message || "I'm researching destinations based on your request. This may take a moment...";
     } else if (trip.status === 'awaiting_confirmation') {
       // Use AI to classify user intent
       const aiProvider = createAIProviderManager(context.env, logger);
@@ -139,7 +132,11 @@ Respond with ONLY valid JSON:
           maxTokens: 200,
           temperature: 0.1,
         },
-        costTracker
+        {
+          tripId,
+          taskType: 'intent_classification',
+          costTracker,
+        }
       );
 
       await logger.logTelemetry(db, tripId, 'intent_classification', {
@@ -198,7 +195,11 @@ Respond with ONLY a valid JSON array of the filtered destinations.`;
               maxTokens: 1500,
               temperature: 0.1,
             },
-            costTracker
+            {
+              tripId,
+              taskType: 'destination_filter',
+              costTracker,
+            }
           );
 
           await logger.logTelemetry(db, tripId, 'destination_filter', {
@@ -239,7 +240,11 @@ Write a brief, friendly confirmation of the changes (1-2 sentences). Then ask if
               maxTokens: 200,
               temperature: 0.7,
             },
-            costTracker
+            {
+              tripId,
+              taskType: 'destination_refinement_response',
+              costTracker,
+            }
           );
 
           aiResponse = changeResponse.text;
@@ -273,7 +278,11 @@ Provide a helpful, friendly response. If they seem to want changes, remind them 
             maxTokens: 500,
             temperature: 0.8,
           },
-          costTracker
+          {
+            tripId,
+            taskType: 'chat_response',
+            costTracker,
+          }
         );
 
         await logger.logTelemetry(db, tripId, 'chat_response', {
@@ -317,7 +326,11 @@ Provide a helpful, friendly response. If the user is ready to see destination re
           maxTokens: 500,
           temperature: 0.8,
         },
-        costTracker
+        {
+          tripId,
+          taskType: 'chat_response',
+          costTracker,
+        }
       );
 
       // Log telemetry for this AI call

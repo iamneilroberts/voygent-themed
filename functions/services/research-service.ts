@@ -75,6 +75,7 @@ export class ResearchService {
   private aiProvider: AIProviderManager;
   private searchClient: SearchClient;
   private firecrawlClient: FirecrawlClient | null;
+  private currentModelId: string | undefined;  // Model ID for current request
 
   constructor(
     private env: Env,
@@ -85,6 +86,13 @@ export class ResearchService {
     this.aiProvider = createAIProviderManager(env, logger);
     this.searchClient = createSearchClient(env, logger);
     this.firecrawlClient = createFirecrawlClient(env, logger);
+  }
+
+  /**
+   * Get model ID from preferences if specified
+   */
+  private getModelId(preferences?: TripPreferences): string | undefined {
+    return (preferences as any)?.ai_model || undefined;
   }
 
   /**
@@ -152,7 +160,12 @@ Respond with ONLY valid JSON in this exact format:
           maxTokens: 600,
           temperature: 0.3,
         },
-        costTracker
+        {
+          modelId: this.getModelId(preferences),
+          tripId,
+          taskType: 'request_interpretation',
+          costTracker,
+        }
       );
 
       await this.logger.logTelemetry(this.db, tripId, 'request_interpretation', {
@@ -208,9 +221,25 @@ Respond with ONLY valid JSON in this exact format:
   async researchDestinations(request: ResearchRequest): Promise<ResearchResult> {
     const { tripId, userMessage, template, preferences } = request;
     const costTracker = createCostTracker(this.db, this.logger, tripId);
+    const startTime = Date.now();
+
+    // Helper to log elapsed time
+    const logTiming = async (step: string) => {
+      const elapsed = Date.now() - startTime;
+      await this.logger.logTelemetry(this.db, tripId, 'timing', {
+        details: { step, elapsed_ms: elapsed, elapsed_s: (elapsed / 1000).toFixed(1) },
+      });
+    };
+
+    // Set model ID from preferences for this request
+    this.currentModelId = this.getModelId(preferences);
+    if (this.currentModelId) {
+      this.logger.info(`Using selected AI model: ${this.currentModelId}`);
+    }
 
     // Update status: researching
     await this.logger.logUserProgress(this.db, tripId, 'Researching destinations...', 10);
+    await logTiming('start');
 
     try {
       // Step 1: AI interprets user request and generates smart search queries
@@ -221,6 +250,7 @@ Respond with ONLY valid JSON in this exact format:
         costTracker,
         tripId
       );
+      await logTiming('after_interpretation');
       this.logger.info(`AI interpretation complete: ${interpretation.raw_interpretation}`);
 
       // Use AI-generated queries
@@ -253,6 +283,7 @@ Respond with ONLY valid JSON in this exact format:
 
       // Step 3: Perform web searches
       const searchResults = await this.searchClient.searchMultiple(queries, 5, costTracker);
+      await logTiming('after_web_search');
       this.logger.info(`Completed ${searchResults.length} searches`);
 
       // Log search results summary
@@ -265,8 +296,14 @@ Respond with ONLY valid JSON in this exact format:
 
       await this.logger.logUserProgress(this.db, tripId, 'Extracting detailed content...', 40);
 
+      // Extract testing parameters from preferences
+      const maxFirecrawlUrls = preferences?.max_firecrawl_urls ?? 1;
+      const useAiConfirmation = preferences?.use_ai_confirmation ?? false;
+      this.logger.info(`Testing params: maxFirecrawlUrls=${maxFirecrawlUrls}, useAiConfirmation=${useAiConfirmation}`);
+
       // Step 3b: Enrich top search results with Firecrawl
-      const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId);
+      const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId, maxFirecrawlUrls);
+      await logTiming('after_firecrawl');
 
       await this.logger.logUserProgress(this.db, tripId, 'Analyzing results...', 50);
 
@@ -279,6 +316,7 @@ Respond with ONLY valid JSON in this exact format:
         costTracker,
         tripId
       );
+      await logTiming('after_research_summary');
       await this.db.updateResearchSummary(tripId, researchSummary);
 
       await this.logger.logUserProgress(this.db, tripId, 'Identifying destinations...', 60);
@@ -291,23 +329,25 @@ Respond with ONLY valid JSON in this exact format:
         costTracker,
         tripId
       );
+      await logTiming('after_destination_synthesis');
 
       await this.logger.logUserProgress(this.db, tripId, 'Preparing recommendations...', 80);
 
       // Step 5: Store research destinations
       await this.db.updateResearchDestinations(tripId, destinations);
 
-      // Step 6: Generate confirmation prompt
+      // Step 6: Generate confirmation message
+      // Default: Use template (fast) to avoid 30s Pages timeout
+      // Optional: Use AI (adds ~3-5s) if use_ai_confirmation=true in preferences
       const confirmationPrompt = this.templateEngine.buildDestinationConfirmation(template, context);
-      const aiResponse = await this.generateConfirmationMessage(
-        destinations,
-        confirmationPrompt,
-        costTracker,
-        tripId
-      );
+      const aiResponse = useAiConfirmation
+        ? await this.generateConfirmationMessage(destinations, confirmationPrompt, costTracker, tripId)
+        : this.formatConfirmationMessage(destinations);
+      await logTiming('after_confirmation');
 
       await this.logger.logUserProgress(this.db, tripId, 'Recommendations ready!', 100);
       await this.db.updateTripStatus(tripId, 'awaiting_confirmation');
+      await logTiming('complete');
 
       return {
         destinations,
@@ -406,7 +446,12 @@ Generate exactly ${numDestinations} destinations that match the user's request.`
         maxTokens: 2000,
         temperature: 0.7,
       },
-      costTracker
+      {
+        modelId: this.currentModelId,
+        tripId,
+        taskType: 'destination_synthesis',
+        costTracker,
+      }
     );
 
     // Log extracted context dynamically (filter out system fields)
@@ -485,7 +530,12 @@ Generate a friendly, conversational message presenting these destinations to the
         maxTokens: 500,
         temperature: 0.8,
       },
-      costTracker
+      {
+        modelId: this.currentModelId,
+        tripId,
+        taskType: 'confirmation_message',
+        costTracker,
+      }
     );
 
     await this.logger.logTelemetry(this.db, tripId, 'confirmation_message', {
@@ -496,6 +546,21 @@ Generate a friendly, conversational message presenting these destinations to the
     });
 
     return aiResponse.text;
+  }
+
+  /**
+   * Format confirmation message without AI (to avoid 30s Pages timeout)
+   * This replaces the AI-generated message with a structured template
+   */
+  private formatConfirmationMessage(destinations: Destination[]): string {
+    const destinationsText = destinations.map((dest, index) => {
+      return `**${index + 1}. ${dest.name}** (${dest.geographic_context})
+   - Key sites: ${dest.key_sites.join(', ')}
+   - Why: ${dest.rationale}
+   - Estimated duration: ${dest.estimated_days} days`;
+    }).join('\n\n');
+
+    return `Based on my research, I've found some wonderful destinations for your trip! Here are my recommendations:\n\n${destinationsText}\n\nWould you like to proceed with these destinations? You can:\n- Click "Confirm & Build Trip" to start building your itinerary\n- Tell me if you'd like to modify the selection (e.g., "just 1 and 2" or "skip the third one")\n- Ask me any questions about these locations`;
   }
 
   /**
@@ -558,7 +623,12 @@ Be specific with place names and facts. This summary helps the traveler understa
         maxTokens: 400,
         temperature: 0.7,
       },
-      costTracker
+      {
+        modelId: this.currentModelId,
+        tripId,
+        taskType: 'research_summary',
+        costTracker,
+      }
     );
 
     await this.logger.logTelemetry(this.db, tripId, 'research_summary', {
@@ -615,7 +685,12 @@ Be specific with place names and facts. This summary helps the traveler understa
           maxTokens: 200,
           temperature: 0.1, // Low temperature for consistent extraction
         },
-        costTracker
+        {
+          modelId: this.currentModelId,
+          tripId,
+          taskType: 'context_extraction',
+          costTracker,
+        }
       );
 
       await this.logger.logTelemetry(this.db, tripId, 'context_extraction', {
@@ -659,15 +734,18 @@ Be specific with place names and facts. This summary helps the traveler understa
 
   /**
    * Enrich search results by scraping top URLs with Firecrawl
-   * Takes top 2 URLs per query and extracts full content
+   * Takes top N URLs per query and extracts full content
+   * @param maxUrls - Max URLs to scrape (0-3). Default 1 to stay under 30s Pages timeout.
    */
   private async enrichSearchResults(
     searchResults: SearchResponse[],
     costTracker: CostTracker,
-    tripId: string
+    tripId: string,
+    maxUrls: number = 1
   ): Promise<EnrichedSearchResult[]> {
-    if (!this.firecrawlClient) {
-      this.logger.debug('Firecrawl not available, using search snippets only');
+    // If maxUrls is 0, skip Firecrawl entirely
+    if (maxUrls === 0 || !this.firecrawlClient) {
+      this.logger.debug(maxUrls === 0 ? 'Firecrawl disabled (maxUrls=0)' : 'Firecrawl not available');
       return searchResults.map(r => ({
         query: r.query,
         results: r.results.map(result => ({
@@ -681,9 +759,9 @@ Be specific with place names and facts. This summary helps the traveler understa
     const urlsToScrape: string[] = [];
     const urlToQueryMap = new Map<string, number>();
 
-    // OPTIMIZATION: Limit to 3 URLs total (down from 2 per query = ~6 total)
-    // This reduces Firecrawl scraping time significantly
-    const MAX_URLS_TO_SCRAPE = 3;
+    // Use configurable limit (default 1 to stay under 30s Pages timeout)
+    // Testing showed: 0 URLs = ~27s, 1 URL = ~23s, 3 URLs = ~35s+ (timeout)
+    const MAX_URLS_TO_SCRAPE = maxUrls;
 
     // Collect top 1 URL per query, then fill remaining slots
     searchResults.forEach((response, queryIndex) => {
@@ -788,7 +866,12 @@ IMPORTANT: Respond with ONLY a valid JSON object in this format:
         maxTokens: 2000,
         temperature: 0.7,
       },
-      costTracker
+      {
+        modelId: this.currentModelId,
+        tripId,
+        taskType: 'destination_refinement',
+        costTracker,
+      }
     );
 
     try {

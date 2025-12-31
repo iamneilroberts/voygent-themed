@@ -1,11 +1,12 @@
 /**
- * AI Provider Fallback Chain
- * VoyGent V3 - Cost Optimization
+ * AI Provider System with Database-Driven Model Selection
+ * VoyGent V3 - Dynamic Model Configuration
  *
- * Implements Constitution principle V: API Cost Optimization
- * Primary: Z.AI (llama-3.3-70b) - cheapest
- * Fallback: OpenRouter (claude-3-haiku or llama-3.1-70b)
- * Backup: OpenAI (gpt-4o-mini)
+ * Features:
+ * - Model configs stored in ai_models table
+ * - Usage logging to ai_usage_logs table
+ * - Dynamic model selection per request
+ * - Automatic fallback chain
  */
 
 import { Env } from './db';
@@ -27,126 +28,336 @@ export interface AIGenerateResponse {
   cost: number;
   provider: string;
   model: string;
+  durationMs: number;
 }
 
 /**
- * AI Provider Interface
+ * Model configuration from database
  */
-export interface AIProvider {
-  name: string;
-  model: string;
-  costPer1kInputTokens: number;
-  costPer1kOutputTokens: number;
-
-  /**
-   * Generate AI response
-   */
-  generate(request: AIGenerateRequest): Promise<AIGenerateResponse>;
-
-  /**
-   * Check if provider is available (has API key configured)
-   */
-  isAvailable(): boolean;
+export interface AIModelConfig {
+  id: string;
+  provider: string;
+  model_id: string;
+  display_name: string;
+  input_cost_per_m: number;
+  output_cost_per_m: number;
+  context_length: number;
+  score_speed: number;
+  score_quality: number;
+  is_active: boolean;
+  is_default: boolean;
+  priority: number;
 }
 
 /**
- * Z.AI Provider (Primary - Cheapest)
+ * Fallback model configs (used when database not available)
  */
-export class ZAIProvider implements AIProvider {
-  name = 'Z.AI';
-  model = 'llama-3.3-70b';
-  costPer1kInputTokens = 0.00006;
-  costPer1kOutputTokens = 0.00006;
+const FALLBACK_MODELS: Record<string, AIModelConfig> = {
+  'llama-3.1-8b': {
+    id: 'llama-3.1-8b',
+    provider: 'openrouter',
+    model_id: 'meta-llama/llama-3.1-8b-instruct',
+    display_name: 'Llama 3.1 8B',
+    input_cost_per_m: 0.02,
+    output_cost_per_m: 0.03,
+    context_length: 131072,
+    score_speed: 8,
+    score_quality: 7,
+    is_active: true,
+    is_default: true,
+    priority: 20,
+  },
+  'llama-3.2-3b': {
+    id: 'llama-3.2-3b',
+    provider: 'openrouter',
+    model_id: 'meta-llama/llama-3.2-3b-instruct',
+    display_name: 'Llama 3.2 3B',
+    input_cost_per_m: 0.02,
+    output_cost_per_m: 0.02,
+    context_length: 131072,
+    score_speed: 9,
+    score_quality: 6,
+    is_active: true,
+    is_default: false,
+    priority: 10,
+  },
+  'gemma-3-4b': {
+    id: 'gemma-3-4b',
+    provider: 'openrouter',
+    model_id: 'google/gemma-3-4b-it',
+    display_name: 'Gemma 3 4B',
+    input_cost_per_m: 0.017,
+    output_cost_per_m: 0.068,
+    context_length: 96000,
+    score_speed: 9,
+    score_quality: 7,
+    is_active: true,
+    is_default: false,
+    priority: 8,
+  },
+  'gemma-3-12b': {
+    id: 'gemma-3-12b',
+    provider: 'openrouter',
+    model_id: 'google/gemma-3-12b-it',
+    display_name: 'Gemma 3 12B',
+    input_cost_per_m: 0.03,
+    output_cost_per_m: 0.10,
+    context_length: 131072,
+    score_speed: 7,
+    score_quality: 8,
+    is_active: true,
+    is_default: false,
+    priority: 28,
+  },
+  'mistral-small-3.1': {
+    id: 'mistral-small-3.1',
+    provider: 'openrouter',
+    model_id: 'mistralai/mistral-small-3.1-24b-instruct',
+    display_name: 'Mistral Small 3.1 24B',
+    input_cost_per_m: 0.03,
+    output_cost_per_m: 0.11,
+    context_length: 131072,
+    score_speed: 7,
+    score_quality: 8,
+    is_active: true,
+    is_default: false,
+    priority: 30,
+  },
+  'gemini-flash-free': {
+    id: 'gemini-flash-free',
+    provider: 'openrouter',
+    model_id: 'google/gemini-2.0-flash-exp:free',
+    display_name: 'Gemini Flash (Free)',
+    input_cost_per_m: 0,
+    output_cost_per_m: 0,
+    context_length: 1048576,
+    score_speed: 9,
+    score_quality: 8,
+    is_active: true,
+    is_default: false,
+    priority: 5,
+  },
+  'mistral-small-free': {
+    id: 'mistral-small-free',
+    provider: 'openrouter',
+    model_id: 'mistralai/mistral-small-3.1-24b-instruct:free',
+    display_name: 'Mistral Small (Free)',
+    input_cost_per_m: 0,
+    output_cost_per_m: 0,
+    context_length: 128000,
+    score_speed: 7,
+    score_quality: 8,
+    is_active: true,
+    is_default: false,
+    priority: 6,
+  },
+  'llama-3.2-3b-free': {
+    id: 'llama-3.2-3b-free',
+    provider: 'openrouter',
+    model_id: 'meta-llama/llama-3.2-3b-instruct:free',
+    display_name: 'Llama 3.2 3B (Free)',
+    input_cost_per_m: 0,
+    output_cost_per_m: 0,
+    context_length: 131072,
+    score_speed: 9,
+    score_quality: 6,
+    is_active: true,
+    is_default: false,
+    priority: 7,
+  },
+  'qwen3-8b': {
+    id: 'qwen3-8b',
+    provider: 'openrouter',
+    model_id: 'qwen/qwen3-8b',
+    display_name: 'Qwen3 8B',
+    input_cost_per_m: 0.028,
+    output_cost_per_m: 0.11,
+    context_length: 128000,
+    score_speed: 8,
+    score_quality: 7,
+    is_active: true,
+    is_default: false,
+    priority: 25,
+  },
+  'gemini-flash-lite': {
+    id: 'gemini-flash-lite',
+    provider: 'openrouter',
+    model_id: 'google/gemini-2.0-flash-lite-001',
+    display_name: 'Gemini 2.0 Flash Lite',
+    input_cost_per_m: 0.075,
+    output_cost_per_m: 0.30,
+    context_length: 1048576,
+    score_speed: 9,
+    score_quality: 8,
+    is_active: true,
+    is_default: false,
+    priority: 35,
+  },
+};
 
-  constructor(private apiKey: string, private logger: Logger) {}
+/**
+ * AI Provider Manager with Database-Driven Model Selection
+ */
+export class AIProviderManager {
+  private db: D1Database | null;
+  private openrouterKey: string | null;
 
-  async generate(request: AIGenerateRequest): Promise<AIGenerateResponse> {
-    const startTime = Date.now();
+  constructor(
+    private env: Env,
+    private logger: Logger
+  ) {
+    this.db = env.DB || null;
+    this.openrouterKey = env.OPENROUTER_API_KEY || null;
 
-    try {
-      const response = await fetch('https://api.zai.chat/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
-            { role: 'user', content: request.prompt },
-          ],
-          max_tokens: request.maxTokens || 2000,
-          temperature: request.temperature || 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Z.AI API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json() as any;
-
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
-      const text = data.choices?.[0]?.message?.content || '';
-
-      const cost = this.calculateCost(inputTokens, outputTokens);
-      const duration = Date.now() - startTime;
-
-      this.logger.debug(`Z.AI completed in ${duration}ms - ${inputTokens + outputTokens} tokens, $${cost.toFixed(4)}`);
-
-      return {
-        text,
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens + outputTokens,
-        cost,
-        provider: this.name,
-        model: this.model,
-      };
-    } catch (error) {
-      this.logger.error(`Z.AI generation failed: ${error}`);
-      throw error;
+    if (!this.openrouterKey) {
+      logger.warn('OPENROUTER_API_KEY not configured');
     }
   }
 
-  isAvailable(): boolean {
-    return !!this.apiKey;
+  /**
+   * Get model config from database or fallback
+   */
+  async getModelConfig(modelId?: string): Promise<AIModelConfig> {
+    // If specific model requested, try to get it
+    if (modelId && this.db) {
+      try {
+        const result = await this.db.prepare(
+          'SELECT * FROM ai_models WHERE id = ? AND is_active = TRUE'
+        ).bind(modelId).first<AIModelConfig>();
+
+        if (result) {
+          this.logger.debug(`Loaded model config from DB: ${result.display_name}`);
+          return result;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to load model from DB: ${error}`);
+      }
+    }
+
+    // If specific model requested but not in DB, check fallback
+    if (modelId && FALLBACK_MODELS[modelId]) {
+      this.logger.debug(`Using fallback config for: ${modelId}`);
+      return FALLBACK_MODELS[modelId];
+    }
+
+    // Try to get default from database
+    if (this.db) {
+      try {
+        const result = await this.db.prepare(
+          'SELECT * FROM ai_models WHERE is_default = TRUE AND is_active = TRUE LIMIT 1'
+        ).first<AIModelConfig>();
+
+        if (result) {
+          this.logger.debug(`Using default model from DB: ${result.display_name}`);
+          return result;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to load default model from DB: ${error}`);
+      }
+    }
+
+    // Final fallback: llama-3.1-8b
+    this.logger.debug('Using hardcoded fallback: llama-3.1-8b');
+    return FALLBACK_MODELS['llama-3.1-8b'];
   }
 
-  private calculateCost(inputTokens: number, outputTokens: number): number {
-    return (inputTokens / 1000) * this.costPer1kInputTokens + (outputTokens / 1000) * this.costPer1kOutputTokens;
+  /**
+   * Log AI usage to database
+   */
+  async logUsage(params: {
+    tripId?: string;
+    taskType: string;
+    modelConfig: AIModelConfig;
+    inputTokens: number;
+    outputTokens: number;
+    durationMs: number;
+    promptLength: number;
+    responseLength: number;
+    temperature?: number;
+    maxTokens?: number;
+    success: boolean;
+    errorMessage?: string;
+  }): Promise<void> {
+    if (!this.db) return;
+
+    const inputCost = (params.inputTokens / 1000000) * params.modelConfig.input_cost_per_m;
+    const outputCost = (params.outputTokens / 1000000) * params.modelConfig.output_cost_per_m;
+    const totalCost = inputCost + outputCost;
+    const tokensPerSecond = params.durationMs > 0
+      ? ((params.inputTokens + params.outputTokens) / params.durationMs) * 1000
+      : 0;
+
+    try {
+      await this.db.prepare(`
+        INSERT INTO ai_usage_logs (
+          trip_id, task_type, provider, model_id, model_display_name,
+          input_tokens, output_tokens, total_tokens,
+          input_cost, output_cost, total_cost,
+          duration_ms, tokens_per_second,
+          prompt_length, response_length, temperature, max_tokens,
+          success, error_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        params.tripId || null,
+        params.taskType,
+        params.modelConfig.provider,
+        params.modelConfig.model_id,
+        params.modelConfig.display_name,
+        params.inputTokens,
+        params.outputTokens,
+        params.inputTokens + params.outputTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        params.durationMs,
+        tokensPerSecond,
+        params.promptLength,
+        params.responseLength,
+        params.temperature || 0.7,
+        params.maxTokens || 2000,
+        params.success ? 1 : 0,
+        params.errorMessage || null
+      ).run();
+
+      this.logger.debug(`Logged AI usage: ${params.taskType} - $${totalCost.toFixed(6)}`);
+    } catch (error) {
+      this.logger.warn(`Failed to log AI usage: ${error}`);
+    }
   }
-}
 
-/**
- * OpenRouter Provider (Fallback)
- * OPTIMIZATION: Using llama-3.1-8b for faster response times (was claude-3-haiku)
- */
-export class OpenRouterProvider implements AIProvider {
-  name = 'OpenRouter';
-  model = 'meta-llama/llama-3.1-8b-instruct';  // Fast and reliable
-  costPer1kInputTokens = 0.00005;
-  costPer1kOutputTokens = 0.00005;
+  /**
+   * Generate AI response with specific or default model
+   */
+  async generate(
+    request: AIGenerateRequest,
+    options?: {
+      modelId?: string;
+      tripId?: string;
+      taskType?: string;
+      costTracker?: CostTracker;
+    }
+  ): Promise<AIGenerateResponse> {
+    if (!this.openrouterKey) {
+      throw new Error('OpenRouter API key not configured');
+    }
 
-  constructor(private apiKey: string, private logger: Logger) {}
-
-  async generate(request: AIGenerateRequest): Promise<AIGenerateResponse> {
+    const modelConfig = await this.getModelConfig(options?.modelId);
     const startTime = Date.now();
+    const taskType = options?.taskType || 'unknown';
+
+    this.logger.info(`AI request [${taskType}] using ${modelConfig.display_name} (${modelConfig.model_id})`);
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${this.openrouterKey}`,
           'HTTP-Referer': 'https://voygent.app',
           'X-Title': 'VoyGent V3',
         },
         body: JSON.stringify({
-          model: this.model,
+          model: modelConfig.model_id,
           messages: [
             ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
             { role: 'user', content: request.prompt },
@@ -166,83 +377,44 @@ export class OpenRouterProvider implements AIProvider {
       const inputTokens = data.usage?.prompt_tokens || 0;
       const outputTokens = data.usage?.completion_tokens || 0;
       const text = data.choices?.[0]?.message?.content || '';
+      const durationMs = Date.now() - startTime;
 
-      const cost = this.calculateCost(inputTokens, outputTokens);
-      const duration = Date.now() - startTime;
+      // Calculate cost
+      const inputCost = (inputTokens / 1000000) * modelConfig.input_cost_per_m;
+      const outputCost = (outputTokens / 1000000) * modelConfig.output_cost_per_m;
+      const cost = inputCost + outputCost;
 
-      this.logger.debug(`OpenRouter completed in ${duration}ms - ${inputTokens + outputTokens} tokens, $${cost.toFixed(4)}`);
+      this.logger.info(
+        `✓ ${modelConfig.display_name} completed in ${durationMs}ms - ` +
+        `${inputTokens + outputTokens} tokens, $${cost.toFixed(6)}`
+      );
 
-      return {
-        text,
+      // Log usage to database
+      await this.logUsage({
+        tripId: options?.tripId,
+        taskType,
+        modelConfig,
         inputTokens,
         outputTokens,
-        totalTokens: inputTokens + outputTokens,
-        cost,
-        provider: this.name,
-        model: this.model,
-      };
-    } catch (error) {
-      this.logger.error(`OpenRouter generation failed: ${error}`);
-      throw error;
-    }
-  }
-
-  isAvailable(): boolean {
-    return !!this.apiKey;
-  }
-
-  private calculateCost(inputTokens: number, outputTokens: number): number {
-    return (inputTokens / 1000) * this.costPer1kInputTokens + (outputTokens / 1000) * this.costPer1kOutputTokens;
-  }
-}
-
-/**
- * OpenAI Provider (Backup)
- */
-export class OpenAIProvider implements AIProvider {
-  name = 'OpenAI';
-  model = 'gpt-4o-mini';
-  costPer1kInputTokens = 0.00015;
-  costPer1kOutputTokens = 0.0006;
-
-  constructor(private apiKey: string, private logger: Logger) {}
-
-  async generate(request: AIGenerateRequest): Promise<AIGenerateResponse> {
-    const startTime = Date.now();
-
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
-            { role: 'user', content: request.prompt },
-          ],
-          max_tokens: request.maxTokens || 2000,
-          temperature: request.temperature || 0.7,
-        }),
+        durationMs,
+        promptLength: request.prompt.length + (request.systemPrompt?.length || 0),
+        responseLength: text.length,
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+        success: true,
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      // Track cost if tracker provided (for backward compatibility)
+      if (options?.costTracker) {
+        await options.costTracker.trackAICost(
+          modelConfig.provider,
+          modelConfig.model_id,
+          inputTokens,
+          outputTokens,
+          modelConfig.input_cost_per_m / 1000, // Convert to per-1k
+          modelConfig.output_cost_per_m / 1000
+        );
       }
-
-      const data = await response.json() as any;
-
-      const inputTokens = data.usage?.prompt_tokens || 0;
-      const outputTokens = data.usage?.completion_tokens || 0;
-      const text = data.choices?.[0]?.message?.content || '';
-
-      const cost = this.calculateCost(inputTokens, outputTokens);
-      const duration = Date.now() - startTime;
-
-      this.logger.debug(`OpenAI completed in ${duration}ms - ${inputTokens + outputTokens} tokens, $${cost.toFixed(4)}`);
 
       return {
         text,
@@ -250,95 +422,53 @@ export class OpenAIProvider implements AIProvider {
         outputTokens,
         totalTokens: inputTokens + outputTokens,
         cost,
-        provider: this.name,
-        model: this.model,
+        provider: modelConfig.provider,
+        model: modelConfig.model_id,
+        durationMs,
       };
     } catch (error) {
-      this.logger.error(`OpenAI generation failed: ${error}`);
+      const durationMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Log failed attempt
+      await this.logUsage({
+        tripId: options?.tripId,
+        taskType,
+        modelConfig,
+        inputTokens: 0,
+        outputTokens: 0,
+        durationMs,
+        promptLength: request.prompt.length + (request.systemPrompt?.length || 0),
+        responseLength: 0,
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+        success: false,
+        errorMessage,
+      });
+
+      this.logger.error(`✗ ${modelConfig.display_name} failed: ${errorMessage}`);
       throw error;
     }
   }
 
-  isAvailable(): boolean {
-    return !!this.apiKey;
-  }
-
-  private calculateCost(inputTokens: number, outputTokens: number): number {
-    return (inputTokens / 1000) * this.costPer1kInputTokens + (outputTokens / 1000) * this.costPer1kOutputTokens;
-  }
-}
-
-/**
- * AI Provider Manager with Fallback Chain
- */
-export class AIProviderManager {
-  private providers: AIProvider[] = [];
-
-  constructor(env: Env, private logger: Logger) {
-    // Build provider chain in priority order (cheapest first)
-    if (env.ZAI_API_KEY) {
-      this.providers.push(new ZAIProvider(env.ZAI_API_KEY, logger));
-    }
-    if (env.OPENROUTER_API_KEY) {
-      this.providers.push(new OpenRouterProvider(env.OPENROUTER_API_KEY, logger));
-    }
-    // Note: OpenAI requires OPENAI_API_KEY (add to Env interface if needed)
-
-    if (this.providers.length === 0) {
-      logger.warn('No AI providers configured! Add ZAI_API_KEY or OPENROUTER_API_KEY to environment.');
-    } else {
-      logger.info(`AI providers configured: ${this.providers.map(p => p.name).join(', ')}`);
-    }
-  }
-
   /**
-   * Generate AI response with automatic fallback
+   * Get list of available models from database
    */
-  async generate(request: AIGenerateRequest, costTracker?: CostTracker): Promise<AIGenerateResponse> {
-    const errors: Error[] = [];
-
-    for (const provider of this.providers) {
-      if (!provider.isAvailable()) {
-        this.logger.debug(`Skipping ${provider.name}: not available`);
-        continue;
-      }
-
-      try {
-        this.logger.info(`Attempting AI generation with ${provider.name} (${provider.model})...`);
-        const response = await provider.generate(request);
-
-        // Track cost if tracker provided
-        if (costTracker) {
-          await costTracker.trackAICost(
-            provider.name,
-            provider.model,
-            response.inputTokens,
-            response.outputTokens,
-            provider.costPer1kInputTokens,
-            provider.costPer1kOutputTokens
-          );
-        }
-
-        this.logger.info(`✓ ${provider.name} succeeded - ${response.totalTokens} tokens, $${response.cost.toFixed(4)}`);
-        return response;
-      } catch (error) {
-        this.logger.warn(`✗ ${provider.name} failed: ${error}`);
-        errors.push(error as Error);
-        // Continue to next provider
-      }
+  async getAvailableModels(): Promise<AIModelConfig[]> {
+    if (!this.db) {
+      return Object.values(FALLBACK_MODELS);
     }
 
-    // All providers failed
-    const errorMsg = `All AI providers failed: ${errors.map(e => e.message).join('; ')}`;
-    this.logger.error(errorMsg);
-    throw new Error(errorMsg);
-  }
+    try {
+      const result = await this.db.prepare(
+        'SELECT * FROM ai_models WHERE is_active = TRUE ORDER BY priority ASC'
+      ).all<AIModelConfig>();
 
-  /**
-   * Get list of available providers
-   */
-  getAvailableProviders(): string[] {
-    return this.providers.filter(p => p.isAvailable()).map(p => `${p.name} (${p.model})`);
+      return result.results || Object.values(FALLBACK_MODELS);
+    } catch (error) {
+      this.logger.warn(`Failed to load models from DB: ${error}`);
+      return Object.values(FALLBACK_MODELS);
+    }
   }
 }
 

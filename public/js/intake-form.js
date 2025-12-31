@@ -144,6 +144,52 @@ const IntakeForm = {
       type: 'text',
       placeholder: 'e.g., 55, 53, 25, 8',
     },
+    // AI Model selection (for testing)
+    ai_model: {
+      label: 'AI Model (Testing)',
+      type: 'select',
+      options: [
+        { value: '', label: 'Auto (Default)' },
+        // Fast & Cheap
+        { value: 'llama-3.2-3b', label: 'Llama 3.2 3B ($0.02) - Fastest' },
+        { value: 'gemma-3-4b', label: 'Gemma 3 4B ($0.017) - Fast' },
+        { value: 'llama-3.1-8b', label: 'Llama 3.1 8B ($0.02) - Balanced' },
+        { value: 'qwen3-8b', label: 'Qwen3 8B ($0.028) - Good Quality' },
+        // Quality
+        { value: 'gemma-3-12b', label: 'Gemma 3 12B ($0.03) - Quality' },
+        { value: 'mistral-small-3.1', label: 'Mistral Small 24B ($0.03) - Best Quality' },
+        { value: 'gemini-flash-lite', label: 'Gemini Flash Lite ($0.075) - Huge Context' },
+        // Free (rate limited)
+        { value: 'gemini-flash-free', label: 'Gemini Flash (Free) - Fast' },
+        { value: 'mistral-small-free', label: 'Mistral Small (Free) - Quality' },
+        { value: 'llama-3.2-3b-free', label: 'Llama 3.2 3B (Free) - Fast' },
+      ],
+      default: '',
+    },
+    // Firecrawl URL count (for testing timeout limits)
+    max_firecrawl_urls: {
+      label: 'Max Firecrawl URLs (Testing)',
+      type: 'select',
+      options: [
+        { value: '', label: 'Default (1 URL)' },
+        { value: '0', label: '0 - No Firecrawl' },
+        { value: '1', label: '1 URL' },
+        { value: '2', label: '2 URLs' },
+        { value: '3', label: '3 URLs' },
+      ],
+      default: '',
+    },
+    // AI confirmation message toggle (for testing)
+    use_ai_confirmation: {
+      label: 'AI Confirmation (Testing)',
+      type: 'select',
+      options: [
+        { value: '', label: 'Default (Template)' },
+        { value: 'true', label: 'Yes - Use AI' },
+        { value: 'false', label: 'No - Use Template' },
+      ],
+      default: '',
+    },
   },
 
   /**

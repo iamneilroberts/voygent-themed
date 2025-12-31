@@ -227,9 +227,16 @@ export class FirecrawlClient {
         if (results.length === 0) {
             return null;
         }
-        // Filter out unwanted domains (ads, aggregators that don't have direct booking)
+        // Prioritize official hotel sites over booking aggregators
         const preferredDomains = type === 'hotel'
-            ? ['booking.com', 'hotels.com', 'expedia.com', 'marriott.com', 'hilton.com', 'ihg.com', 'hyatt.com', 'accor.com']
+            ? [
+                // Official hotel chains first
+                'marriott.com', 'hilton.com', 'ihg.com', 'hyatt.com', 'accor.com',
+                'fourseasons.com', 'ritzcarlton.com', 'starwoodhotels.com', 'wyndhamhotels.com',
+                'choicehotels.com', 'bestwestern.com', 'radissonhotels.com',
+                // Booking aggregators as fallback
+                'booking.com', 'hotels.com', 'expedia.com',
+            ]
             : ['viator.com', 'getyourguide.com', 'tripadvisor.com', 'klook.com'];
         // First try to find a result from preferred domains
         for (const result of results) {

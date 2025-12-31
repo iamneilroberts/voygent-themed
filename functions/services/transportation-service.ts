@@ -237,7 +237,11 @@ Respond with ONLY valid JSON:
           maxTokens: 1000,
           temperature: 0.5,
         },
-        costTracker
+        {
+          tripId,
+          taskType: 'transportation_recommendation',
+          costTracker,
+        }
       );
 
       await this.logger.logTelemetry(this.db, tripId, 'transportation_recommendation', {

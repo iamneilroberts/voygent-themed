@@ -25,6 +25,7 @@ export class ResearchService {
     aiProvider;
     searchClient;
     firecrawlClient;
+    currentModelId; // Model ID for current request
     constructor(env, db, logger) {
         this.env = env;
         this.db = db;
@@ -35,33 +36,168 @@ export class ResearchService {
         this.firecrawlClient = createFirecrawlClient(env, logger);
     }
     /**
+     * Get model ID from preferences if specified
+     */
+    getModelId(preferences) {
+        return preferences?.ai_model || undefined;
+    }
+    /**
+     * AI-powered interpretation of user request
+     * Generates smart search queries and extracts context without hardcoded placeholders
+     */
+    async interpretUserRequest(userMessage, template, preferences, costTracker, tripId) {
+        const duration = preferences?.duration || '7 days';
+        const activityLevel = preferences?.activity_level || 'Moderate';
+        const numTravelers = (preferences?.travelers_adults || 2) + (preferences?.travelers_children || 0);
+        const userNumDestinations = preferences?.num_destinations;
+        const prompt = `You are a travel research assistant helping plan a "${template.name}" trip.
+
+TEMPLATE THEME: ${template.name}
+TEMPLATE DESCRIPTION: ${template.description}
+${template.example_inputs ? `EXAMPLE REQUESTS FOR THIS THEME: ${JSON.parse(template.example_inputs).join(', ')}` : ''}
+
+USER'S REQUEST: "${userMessage}"
+
+TRIP PARAMETERS:
+- Duration: ${duration}
+- Activity Level: ${activityLevel}
+- Number of Travelers: ${numTravelers}
+${preferences?.traveler_ages ? `- Traveler Ages: ${preferences.traveler_ages.join(', ')}` : ''}
+${userNumDestinations ? `- Requested Destinations: ${userNumDestinations}` : '- Destinations: Not specified (you decide)'}
+
+YOUR TASK:
+1. Understand what the user wants based on their message and the template theme
+2. Generate 2-4 web search queries that will find relevant destination information
+3. Extract key details from their request
+4. Determine how many destinations are appropriate (if not specified)
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "search_queries": [
+    "specific search query 1 for finding destinations",
+    "specific search query 2 for finding destinations"
+  ],
+  "extracted_details": {
+    "primary_interest": "main focus of the trip",
+    "geographic_focus": "location/region if mentioned, or null",
+    "specific_requirements": ["any specific things mentioned"]
+  },
+  "constraints": {
+    "geographic_region": "specific region to focus on, or null",
+    "thematic_focus": "the theme/type of experience",
+    "suggested_num_destinations": 3,
+    "reasoning": "Brief explanation of why this number of destinations"
+  },
+  "raw_interpretation": "One sentence summary of what the user wants"
+}`;
+        try {
+            const aiResponse = await this.aiProvider.generate({
+                prompt,
+                systemPrompt: 'You are a travel research assistant. Respond with valid JSON only. Generate search queries that will find real destinations and travel information.',
+                maxTokens: 600,
+                temperature: 0.3,
+            }, {
+                modelId: this.getModelId(preferences),
+                tripId,
+                taskType: 'request_interpretation',
+                costTracker,
+            });
+            await this.logger.logTelemetry(this.db, tripId, 'request_interpretation', {
+                provider: aiResponse.provider,
+                model: aiResponse.model,
+                tokens: aiResponse.totalTokens,
+                cost: aiResponse.cost,
+                details: { user_message_preview: userMessage.substring(0, 100) },
+            });
+            // Parse AI response
+            const jsonMatch = aiResponse.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const interpreted = JSON.parse(jsonMatch[0]);
+                // Override with user preference if specified
+                if (userNumDestinations) {
+                    interpreted.constraints.suggested_num_destinations = userNumDestinations;
+                    interpreted.constraints.reasoning = `User specified ${userNumDestinations} destinations`;
+                }
+                this.logger.info(`AI interpretation: ${JSON.stringify(interpreted)}`);
+                return interpreted;
+            }
+        }
+        catch (error) {
+            this.logger.error(`AI interpretation failed: ${error}`);
+        }
+        // Fallback: basic interpretation
+        return {
+            search_queries: [
+                `${template.name} ${userMessage} travel destinations`,
+                `best places ${userMessage} ${template.name} trip`,
+            ],
+            extracted_details: {
+                primary_interest: template.name,
+                geographic_focus: undefined,
+                specific_requirements: [],
+            },
+            constraints: {
+                geographic_region: undefined,
+                thematic_focus: template.name,
+                suggested_num_destinations: 3,
+                reasoning: 'Default fallback',
+            },
+            raw_interpretation: userMessage,
+        };
+    }
+    /**
      * Perform destination research
      */
     async researchDestinations(request) {
         const { tripId, userMessage, template, preferences } = request;
         const costTracker = createCostTracker(this.db, this.logger, tripId);
+        const startTime = Date.now();
+        // Helper to log elapsed time
+        const logTiming = async (step) => {
+            const elapsed = Date.now() - startTime;
+            await this.logger.logTelemetry(this.db, tripId, 'timing', {
+                details: { step, elapsed_ms: elapsed, elapsed_s: (elapsed / 1000).toFixed(1) },
+            });
+        };
+        // Set model ID from preferences for this request
+        this.currentModelId = this.getModelId(preferences);
+        if (this.currentModelId) {
+            this.logger.info(`Using selected AI model: ${this.currentModelId}`);
+        }
         // Update status: researching
         await this.logger.logUserProgress(this.db, tripId, 'Researching destinations...', 10);
+        await logTiming('start');
         try {
-            // Step 1: Extract context using AI for template-specific placeholders
-            const context = await this.extractContextWithAI(userMessage, template, preferences, costTracker, tripId);
-            this.logger.debug(`Extracted context: ${JSON.stringify(context)}`);
-            // Step 2: Build research queries from template
-            const queries = this.templateEngine.buildResearchQueries(template, context);
-            this.logger.info(`Built ${queries.length} research queries: ${queries.join(', ')}`);
+            // Step 1: AI interprets user request and generates smart search queries
+            const interpretation = await this.interpretUserRequest(userMessage, template, preferences, costTracker, tripId);
+            await logTiming('after_interpretation');
+            this.logger.info(`AI interpretation complete: ${interpretation.raw_interpretation}`);
+            // Use AI-generated queries
+            const queries = interpretation.search_queries;
             if (queries.length === 0) {
-                throw new Error('No research queries configured in template');
+                throw new Error('AI failed to generate search queries');
             }
-            // Log the actual queries being executed
+            // Log the AI interpretation and queries
             await this.logger.logTelemetry(this.db, tripId, 'search_queries', {
                 details: {
                     queries: queries,
-                    extracted_context: context,
+                    interpretation: interpretation.extracted_details,
+                    constraints: interpretation.constraints,
                 },
             });
             await this.logger.logUserProgress(this.db, tripId, 'Searching the web for destinations...', 30);
+            // Build context for compatibility with existing synthesis methods
+            const context = {
+                ...preferences,
+                ...interpretation.extracted_details,
+                geographic_focus: interpretation.constraints.geographic_region,
+                thematic_focus: interpretation.constraints.thematic_focus,
+                suggested_num_destinations: interpretation.constraints.suggested_num_destinations,
+                topic: userMessage,
+            };
             // Step 3: Perform web searches
             const searchResults = await this.searchClient.searchMultiple(queries, 5, costTracker);
+            await logTiming('after_web_search');
             this.logger.info(`Completed ${searchResults.length} searches`);
             // Log search results summary
             await this.logger.logTelemetry(this.db, tripId, 'search_results', {
@@ -71,23 +207,36 @@ export class ResearchService {
                 },
             });
             await this.logger.logUserProgress(this.db, tripId, 'Extracting detailed content...', 40);
+            // Extract testing parameters from preferences
+            const maxFirecrawlUrls = preferences?.max_firecrawl_urls ?? 1;
+            const useAiConfirmation = preferences?.use_ai_confirmation ?? false;
+            this.logger.info(`Testing params: maxFirecrawlUrls=${maxFirecrawlUrls}, useAiConfirmation=${useAiConfirmation}`);
             // Step 3b: Enrich top search results with Firecrawl
-            const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId);
+            const enrichedResults = await this.enrichSearchResults(searchResults, costTracker, tripId, maxFirecrawlUrls);
+            await logTiming('after_firecrawl');
             await this.logger.logUserProgress(this.db, tripId, 'Analyzing results...', 50);
             // Step 4: Generate and store research summary
             const researchSummary = await this.generateResearchSummary(queries, enrichedResults, template, context, costTracker, tripId);
+            await logTiming('after_research_summary');
             await this.db.updateResearchSummary(tripId, researchSummary);
             await this.logger.logUserProgress(this.db, tripId, 'Identifying destinations...', 60);
             // Step 5: Synthesize results with AI (using enriched content)
             const destinations = await this.synthesizeDestinations(template, context, enrichedResults, costTracker, tripId);
+            await logTiming('after_destination_synthesis');
             await this.logger.logUserProgress(this.db, tripId, 'Preparing recommendations...', 80);
             // Step 5: Store research destinations
             await this.db.updateResearchDestinations(tripId, destinations);
-            // Step 6: Generate confirmation prompt
+            // Step 6: Generate confirmation message
+            // Default: Use template (fast) to avoid 30s Pages timeout
+            // Optional: Use AI (adds ~3-5s) if use_ai_confirmation=true in preferences
             const confirmationPrompt = this.templateEngine.buildDestinationConfirmation(template, context);
-            const aiResponse = await this.generateConfirmationMessage(destinations, confirmationPrompt, costTracker, tripId);
+            const aiResponse = useAiConfirmation
+                ? await this.generateConfirmationMessage(destinations, confirmationPrompt, costTracker, tripId)
+                : this.formatConfirmationMessage(destinations);
+            await logTiming('after_confirmation');
             await this.logger.logUserProgress(this.db, tripId, 'Recommendations ready!', 100);
             await this.db.updateTripStatus(tripId, 'awaiting_confirmation');
+            await logTiming('complete');
             return {
                 destinations,
                 aiResponse,
@@ -120,14 +269,18 @@ export class ResearchService {
             });
             searchContext += '\n';
         });
-        // Build geographic constraint if region was extracted
+        // Build geographic constraint from any location-related field
+        const geoFocus = context.geographic_focus || context.region || context.destination || context.location;
         let regionConstraint = '';
-        if (context.region) {
-            regionConstraint = `\nCRITICAL GEOGRAPHIC CONSTRAINT: All destinations MUST be located in or near "${context.region}". Do NOT suggest locations in other countries or regions. The user specifically wants to travel to ${context.region}.\n`;
+        if (geoFocus) {
+            regionConstraint = `\nCRITICAL GEOGRAPHIC CONSTRAINT: All destinations MUST be located in or near "${geoFocus}". Do NOT suggest locations in other countries or regions. The user specifically wants to travel to ${geoFocus}.\n`;
         }
-        // Build user context summary
+        // Determine number of destinations
+        const numDestinations = context.suggested_num_destinations || 3;
+        // Build user context summary (filter out internal fields)
+        const systemFields = ['departure_airport', 'luxury_level', 'activity_level', 'duration', 'travelers_adults', 'travelers_children', 'suggested_num_destinations'];
         const userContextSummary = Object.entries(context)
-            .filter(([key, value]) => value && !['departure_airport', 'luxury_level', 'activity_level'].includes(key))
+            .filter(([key, value]) => value && !systemFields.includes(key))
             .map(([key, value]) => `- ${key}: ${value}`)
             .join('\n');
         // Build full prompt
@@ -141,7 +294,7 @@ ${userContextSummary}
 ${searchContext}
 
 IMPORTANT: Your response must be ONLY a valid JSON array of destinations. No additional text or explanation.
-${context.region ? `All destinations MUST be in ${context.region} - do not suggest US or other country locations.` : ''}
+${geoFocus ? `All destinations MUST be in ${geoFocus} - do not suggest locations in other countries or regions.` : ''}
 
 Format:
 [
@@ -155,23 +308,39 @@ Format:
   }
 ]
 
-Generate 2-4 destinations that match the user's request.`;
+Generate exactly ${numDestinations} destinations that match the user's request.`;
         this.logger.info(`Synthesis prompt context: ${JSON.stringify(context)}`);
+        // Use the geographic focus we already determined
+        const geographicFocus = geoFocus ? `Focus exclusively on destinations in ${geoFocus}.` : '';
         // Call AI
         const aiResponse = await this.aiProvider.generate({
             prompt: fullPrompt,
-            systemPrompt: `You are a ${template.name} travel research assistant. Respond ONLY with valid JSON arrays, no additional text. ${context.region ? `Focus exclusively on destinations in ${context.region}.` : ''}`,
+            systemPrompt: `You are a ${template.name} travel research assistant. Respond ONLY with valid JSON arrays, no additional text. ${geographicFocus}`,
             maxTokens: 2000,
             temperature: 0.7,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'destination_synthesis',
+            costTracker,
+        });
+        // Log extracted context dynamically (filter out system fields)
+        const extractedContextForLog = {};
+        const logSystemFields = ['departure_airport', 'luxury_level', 'activity_level', 'duration', 'travelers_adults', 'travelers_children', 'departure_date', 'suggested_num_destinations', 'topic'];
+        Object.keys(context).forEach(key => {
+            if (!logSystemFields.includes(key) && context[key]) {
+                extractedContextForLog[key] = context[key];
+            }
+        });
         await this.logger.logTelemetry(this.db, tripId, 'destination_synthesis', {
             provider: aiResponse.provider,
             model: aiResponse.model,
             tokens: aiResponse.totalTokens,
             cost: aiResponse.cost,
             details: {
-                region: context.region || 'not specified',
-                surname: context.surname || 'not specified',
+                extracted_context: extractedContextForLog,
+                geographic_focus: geoFocus || 'none',
+                num_destinations_requested: numDestinations,
                 search_results_count: enrichedResults.reduce((sum, r) => sum + r.results.length, 0),
             },
         });
@@ -217,7 +386,12 @@ Generate a friendly, conversational message presenting these destinations to the
             systemPrompt: 'You are a friendly travel assistant helping users plan heritage trips.',
             maxTokens: 500,
             temperature: 0.8,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'confirmation_message',
+            costTracker,
+        });
         await this.logger.logTelemetry(this.db, tripId, 'confirmation_message', {
             provider: aiResponse.provider,
             model: aiResponse.model,
@@ -225,6 +399,19 @@ Generate a friendly, conversational message presenting these destinations to the
             cost: aiResponse.cost,
         });
         return aiResponse.text;
+    }
+    /**
+     * Format confirmation message without AI (to avoid 30s Pages timeout)
+     * This replaces the AI-generated message with a structured template
+     */
+    formatConfirmationMessage(destinations) {
+        const destinationsText = destinations.map((dest, index) => {
+            return `**${index + 1}. ${dest.name}** (${dest.geographic_context})
+   - Key sites: ${dest.key_sites.join(', ')}
+   - Why: ${dest.rationale}
+   - Estimated duration: ${dest.estimated_days} days`;
+        }).join('\n\n');
+        return `Based on my research, I've found some wonderful destinations for your trip! Here are my recommendations:\n\n${destinationsText}\n\nWould you like to proceed with these destinations? You can:\n- Click "Confirm & Build Trip" to start building your itinerary\n- Tell me if you'd like to modify the selection (e.g., "just 1 and 2" or "skip the third one")\n- Ask me any questions about these locations`;
     }
     /**
      * Generate research summary from search results
@@ -273,7 +460,12 @@ Be specific with place names and facts. This summary helps the traveler understa
             systemPrompt: 'You are a friendly travel research assistant. Write concise, engaging summaries.',
             maxTokens: 400,
             temperature: 0.7,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'research_summary',
+            costTracker,
+        });
         await this.logger.logTelemetry(this.db, tripId, 'research_summary', {
             provider: aiResponse.provider,
             model: aiResponse.model,
@@ -309,7 +501,12 @@ Be specific with place names and facts. This summary helps the traveler understa
                 systemPrompt: 'You are a precise data extraction assistant. Extract only what is explicitly mentioned. Respond with valid JSON only.',
                 maxTokens: 200,
                 temperature: 0.1, // Low temperature for consistent extraction
-            }, costTracker);
+            }, {
+                modelId: this.currentModelId,
+                tripId,
+                taskType: 'context_extraction',
+                costTracker,
+            });
             await this.logger.logTelemetry(this.db, tripId, 'context_extraction', {
                 provider: aiResponse.provider,
                 model: aiResponse.model,
@@ -346,11 +543,13 @@ Be specific with place names and facts. This summary helps the traveler understa
     }
     /**
      * Enrich search results by scraping top URLs with Firecrawl
-     * Takes top 2 URLs per query and extracts full content
+     * Takes top N URLs per query and extracts full content
+     * @param maxUrls - Max URLs to scrape (0-3). Default 1 to stay under 30s Pages timeout.
      */
-    async enrichSearchResults(searchResults, costTracker, tripId) {
-        if (!this.firecrawlClient) {
-            this.logger.debug('Firecrawl not available, using search snippets only');
+    async enrichSearchResults(searchResults, costTracker, tripId, maxUrls = 1) {
+        // If maxUrls is 0, skip Firecrawl entirely
+        if (maxUrls === 0 || !this.firecrawlClient) {
+            this.logger.debug(maxUrls === 0 ? 'Firecrawl disabled (maxUrls=0)' : 'Firecrawl not available');
             return searchResults.map(r => ({
                 query: r.query,
                 results: r.results.map(result => ({
@@ -362,15 +561,33 @@ Be specific with place names and facts. This summary helps the traveler understa
         }
         const urlsToScrape = [];
         const urlToQueryMap = new Map();
-        // Collect top 2 URLs per query
+        // Use configurable limit (default 1 to stay under 30s Pages timeout)
+        // Testing showed: 0 URLs = ~27s, 1 URL = ~23s, 3 URLs = ~35s+ (timeout)
+        const MAX_URLS_TO_SCRAPE = maxUrls;
+        // Collect top 1 URL per query, then fill remaining slots
         searchResults.forEach((response, queryIndex) => {
-            response.results.slice(0, 2).forEach(result => {
+            if (urlsToScrape.length < MAX_URLS_TO_SCRAPE && response.results.length > 0) {
+                const result = response.results[0];
                 if (!urlsToScrape.includes(result.url)) {
                     urlsToScrape.push(result.url);
                     urlToQueryMap.set(result.url, queryIndex);
                 }
-            });
+            }
         });
+        // Fill remaining slots with second results from queries
+        if (urlsToScrape.length < MAX_URLS_TO_SCRAPE) {
+            searchResults.forEach((response, queryIndex) => {
+                if (urlsToScrape.length >= MAX_URLS_TO_SCRAPE)
+                    return;
+                if (response.results.length > 1) {
+                    const result = response.results[1];
+                    if (!urlsToScrape.includes(result.url)) {
+                        urlsToScrape.push(result.url);
+                        urlToQueryMap.set(result.url, queryIndex);
+                    }
+                }
+            });
+        }
         this.logger.info(`Enriching ${urlsToScrape.length} URLs with Firecrawl...`);
         // Scrape URLs in parallel (with concurrency limit and telemetry)
         const scrapeResults = await this.firecrawlClient.scrapeMultiple(urlsToScrape, { formats: ['markdown'], onlyMainContent: true }, costTracker, 3, // Concurrency limit
@@ -430,7 +647,12 @@ IMPORTANT: Respond with ONLY a valid JSON object in this format:
             systemPrompt: 'You are a travel assistant. Respond ONLY with valid JSON, no additional text.',
             maxTokens: 2000,
             temperature: 0.7,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'destination_refinement',
+            costTracker,
+        });
         try {
             const jsonMatch = aiResponse.text.match(/\{[\s\S]*\}/);
             if (!jsonMatch)
