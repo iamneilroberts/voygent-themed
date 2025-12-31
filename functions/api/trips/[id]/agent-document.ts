@@ -813,8 +813,8 @@ function generateItinerarySection(dailyItinerary: DayItinerary[]): string {
   const daysHtml = dailyItinerary.map(day => `
     <div class="day-block">
       <div class="day-header">
-        <span class="day-num">Day ${day.day}</span>
-        <span>${escapeHtml(day.location)}</span>
+        <span class="day-num">Day ${day.day_number}${day.date ? ` - ${formatDateDisplay(day.date)}` : ''}</span>
+        <span>${escapeHtml(day.city)}</span>
       </div>
       <div class="day-content">
         ${day.theme ? `<div style="font-style: italic; color: #6b7280; margin-bottom: 10px;">"${escapeHtml(day.theme)}"</div>` : ''}
@@ -961,5 +961,19 @@ function formatDateTime(isoString: string | undefined): string {
     });
   } catch {
     return isoString;
+  }
+}
+
+function formatDateDisplay(dateString: string | undefined): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString + 'T00:00:00');  // Ensure proper parsing
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return dateString;
   }
 }

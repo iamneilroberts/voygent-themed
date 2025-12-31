@@ -184,6 +184,7 @@ export interface Flight {
   route: string;
   departure: string;
   arrival: string;
+  cost_usd?: number;  // Flight cost for this segment
 }
 
 export interface Hotel {

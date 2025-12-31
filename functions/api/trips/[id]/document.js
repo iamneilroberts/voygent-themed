@@ -623,8 +623,8 @@ function generateItinerarySection(dailyItinerary) {
         return `
     <div class="day-card">
       <div class="day-header">
-        <span class="day-number">Day ${day.day}</span>
-        <span class="day-location">📍 ${escapeHtml(day.location)}</span>
+        <span class="day-number">Day ${day.day_number}${day.date ? ` - ${formatDateDisplay(day.date)}` : ''}</span>
+        <span class="day-location">📍 ${escapeHtml(day.city)}</span>
       </div>
       <div class="day-content">
         ${day.theme ? `<div class="day-theme">"${escapeHtml(day.theme)}"</div>` : ''}
@@ -678,6 +678,21 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+function formatDateDisplay(dateString) {
+    if (!dateString)
+        return '';
+    try {
+        const date = new Date(dateString + 'T00:00:00');
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+        });
+    }
+    catch {
+        return dateString;
+    }
 }
 function formatNumber(num) {
     if (!num)

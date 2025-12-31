@@ -16,21 +16,18 @@ import { createAmadeusClient } from './amadeus-client';
 import { createViatorClient } from './viator-client';
 import { createFirecrawlClient } from './firecrawl-client';
 import { jsonrepair } from 'jsonrepair';
-
 /**
  * Extract and repair JSON from AI response
  */
 function extractAndRepairJSON(text) {
     // Remove markdown code block markers
     let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-
     // Extract just the JSON array portion
     const arrayStart = cleaned.indexOf('[');
     const arrayEnd = cleaned.lastIndexOf(']');
     if (arrayStart >= 0 && arrayEnd > arrayStart) {
         cleaned = cleaned.slice(arrayStart, arrayEnd + 1);
     }
-
     // Use jsonrepair library to fix any remaining issues
     return jsonrepair(cleaned);
 }
@@ -462,12 +459,15 @@ export class TripBuilderService {
         // Calculate trip duration in days
         const tripDays = this.parseDuration(preferences.duration || '7 days');
         const departureAirport = preferences.departure_airport || 'JFK';
+        // Calculate actual trip dates
+        const departureDate = preferences.departure_date || this.getDefaultDepartureDate();
+        const returnDate = this.getReturnDate(departureDate, preferences.duration || '7 days');
         const prompt = `${optionsPrompt}
 
 CONFIRMED DESTINATIONS (You MUST use these exact locations):
 ${destinations.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 
-TRIP DURATION: ${tripDays} days
+TRIP DATES: ${departureDate} to ${returnDate} (${tripDays} days)
 DEPARTURE AIRPORT: ${departureAirport} (ALL flights MUST depart from and return to this airport)
 
 Available booking options:
@@ -491,6 +491,8 @@ CRITICAL REQUIREMENTS:
 7. Include info_url for tours (use format: https://www.google.com/search?q=TOUR+NAME+CITY)
 8. CRITICAL: ALL flight routes MUST use ${departureAirport} as the departure and return airport - do NOT use any other airports
 9. CRITICAL: Output MUST be valid JSON with proper commas between all array elements and object properties
+10. CRITICAL: Use the exact trip dates provided (${departureDate} departure, ${returnDate} return)
+11. CRITICAL: Include cost_usd for both outbound and return flights (estimate $400-800 per segment for transatlantic)
 
 Format:
 [
@@ -498,8 +500,8 @@ Format:
     "option_index": 1,
     "total_cost_usd": 3500.00,
     "flights": {
-      "outbound": { "airline": "British Airways", "route": "${departureAirport} → EDI", "departure": "2025-06-01T10:00", "arrival": "2025-06-01T22:00" },
-      "return": { "airline": "British Airways", "route": "EDI → ${departureAirport}", "departure": "2025-06-08T12:00", "arrival": "2025-06-08T15:00" }
+      "outbound": { "airline": "British Airways", "route": "${departureAirport} → EDI", "departure": "${departureDate}T10:00", "arrival": "${departureDate}T22:00", "cost_usd": 650.00 },
+      "return": { "airline": "British Airways", "route": "EDI → ${departureAirport}", "departure": "${returnDate}T12:00", "arrival": "${returnDate}T15:00", "cost_usd": 650.00 }
     },
     "hotels": [
       { "city": "${destinations[0] || 'Destination 1'}", "name": "Hotel Name", "rating": 4, "nights": 4, "cost_per_night_usd": 180.00, "info_url": "https://www.google.com/search?q=Hotel+Name+City+hotel" }
@@ -570,17 +572,29 @@ Format:
         // Safely handle potentially undefined arrays
         const hotels = option.hotels || [];
         const tours = option.tours || [];
+        // Extract trip start date from flights, or use default (6 months from now)
+        let tripStartDate = this.getDefaultDepartureDate();
+        if (option.flights?.outbound?.departure) {
+            // Extract date from ISO datetime string (e.g., "2025-06-01T10:00")
+            tripStartDate = option.flights.outbound.departure.split('T')[0];
+        }
+        // Generate all trip dates
+        const tripDates = this.generateTripDates(tripStartDate, tripDays);
         // Log telemetry for the request
         await this.logger.logTelemetry(this.db, tripId, 'itinerary_generation_start', {
             details: {
                 option_index: option.option_index,
                 destinations,
                 trip_days: tripDays,
+                trip_start_date: tripStartDate,
                 hotels_count: hotels.length,
                 tours_count: tours.length,
             },
         });
         const prompt = `Create a day-by-day itinerary for a ${tripDays}-day trip to ${destinations.join(', ')}.
+
+TRIP DATES: ${tripStartDate} to ${tripDates[tripDates.length - 1]} (${tripDays} days)
+Daily dates: ${tripDates.map((d, i) => `Day ${i + 1}: ${d}`).join(', ')}
 
 TRIP DETAILS:
 - Hotels: ${hotels.length > 0 ? hotels.map(h => `${h.name} in ${h.city} (${h.nights} nights)`).join(', ') : 'None specified'}
@@ -593,10 +607,13 @@ Create a daily_itinerary array with one entry per day. Each day should have 3-4 
 - dining: Restaurant recommendations
 - tour: The booked tours (integrate them appropriately)
 
+CRITICAL: Include the "date" field for each day using the exact dates provided above.
+
 Format as JSON array:
 [
   {
     "day_number": 1,
+    "date": "${tripDates[0]}",
     "city": "CityName",
     "theme": "Arrival Day",
     "activities": [
@@ -711,11 +728,11 @@ Format as JSON array:
         }
     }
     /**
-     * Helper: Get default departure date (30 days from now)
+     * Helper: Get default departure date (6 months from now)
      */
     getDefaultDepartureDate() {
         const date = new Date();
-        date.setDate(date.getDate() + 30);
+        date.setMonth(date.getMonth() + 6);
         return this.formatDate(date);
     }
     /**
@@ -747,6 +764,19 @@ Format as JSON array:
         const start = new Date(checkIn);
         const end = new Date(checkOut);
         return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    /**
+     * Helper: Generate array of trip dates from start date
+     */
+    generateTripDates(startDate, tripDays) {
+        const dates = [];
+        const start = new Date(startDate);
+        for (let i = 0; i < tripDays; i++) {
+            const date = new Date(start);
+            date.setDate(start.getDate() + i);
+            dates.push(this.formatDate(date));
+        }
+        return dates;
     }
 }
 /**
