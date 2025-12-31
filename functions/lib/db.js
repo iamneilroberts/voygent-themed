@@ -12,6 +12,13 @@ export class DatabaseClient {
     constructor(db) {
         this.db = db;
     }
+    /**
+     * Get the underlying D1Database for direct access
+     * Used by clients that need raw DB access for caching
+     */
+    getD1Database() {
+        return this.db;
+    }
     // Trip Templates
     async getTemplate(id) {
         return await this.db

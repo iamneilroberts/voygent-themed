@@ -141,6 +141,11 @@ export interface TripPreferences {
   // New: Transportation preferences
   transportation_preference?: 'rental_car' | 'public_transit' | 'driver_hire' | 'flexible';
   driving_comfort?: 'comfortable_abroad' | 'prefer_familiar' | 'no_driving';
+
+  // Testing parameters (for tuning performance)
+  ai_model?: string;  // Override default AI model
+  max_firecrawl_urls?: number;  // 0-3, default 1
+  use_ai_confirmation?: boolean;  // default false (template)
 }
 
 export interface TransportationRecommendation {
@@ -232,6 +237,14 @@ export interface TelemetryLog {
  */
 export class DatabaseClient {
   constructor(private db: D1Database) {}
+
+  /**
+   * Get the underlying D1Database for direct access
+   * Used by clients that need raw DB access for caching
+   */
+  getD1Database(): D1Database {
+    return this.db;
+  }
 
   // Trip Templates
 

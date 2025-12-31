@@ -15,6 +15,25 @@ import { createAIProviderManager } from '../lib/ai-providers';
 import { createAmadeusClient } from './amadeus-client';
 import { createViatorClient } from './viator-client';
 import { createFirecrawlClient } from './firecrawl-client';
+import { jsonrepair } from 'jsonrepair';
+
+/**
+ * Extract and repair JSON from AI response
+ */
+function extractAndRepairJSON(text) {
+    // Remove markdown code block markers
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+
+    // Extract just the JSON array portion
+    const arrayStart = cleaned.indexOf('[');
+    const arrayEnd = cleaned.lastIndexOf(']');
+    if (arrayStart >= 0 && arrayEnd > arrayStart) {
+        cleaned = cleaned.slice(arrayStart, arrayEnd + 1);
+    }
+
+    // Use jsonrepair library to fix any remaining issues
+    return jsonrepair(cleaned);
+}
 /**
  * Trip Builder Service
  */
@@ -28,6 +47,7 @@ export class TripBuilderService {
     viatorClient = null;
     firecrawlClient = null;
     currentTripId = null; // For telemetry context
+    currentModelId; // Model ID for current request
     constructor(env, db, logger) {
         this.env = env;
         this.db = db;
@@ -42,7 +62,7 @@ export class TripBuilderService {
             this.logger.warn(`Amadeus client not available: ${error}`);
         }
         try {
-            this.viatorClient = createViatorClient(env, logger);
+            this.viatorClient = createViatorClient(env, logger, db.getD1Database());
         }
         catch (error) {
             this.logger.warn(`Viator client not available: ${error}`);
@@ -59,6 +79,11 @@ export class TripBuilderService {
     async buildTripOptions(request) {
         const { tripId, template, confirmedDestinations, preferences } = request;
         this.currentTripId = tripId; // Set for telemetry context
+        // Set model ID from preferences for this request
+        this.currentModelId = preferences?.ai_model || undefined;
+        if (this.currentModelId) {
+            this.logger.info(`Using selected AI model: ${this.currentModelId}`);
+        }
         this.logger.info(`=== PHASE 2 START: Building trip options for ${tripId} ===`);
         this.logger.info(`Amadeus available: ${!!this.amadeusClient}, Viator available: ${!!this.viatorClient}`);
         const costTracker = createCostTracker(this.db, this.logger, tripId);
@@ -275,7 +300,7 @@ export class TripBuilderService {
         const searchDetails = [];
         for (const destination of destinations) {
             const destStartTime = Date.now();
-            const destinationId = this.viatorClient.getDestinationId(destination);
+            const destinationId = await this.viatorClient.getDestinationId(destination);
             try {
                 const tours = await this.viatorClient.searchTours({
                     destination: destinationId,
@@ -465,6 +490,7 @@ CRITICAL REQUIREMENTS:
 6. Include info_url for hotels (use format: https://www.google.com/search?q=HOTEL+NAME+CITY+hotel)
 7. Include info_url for tours (use format: https://www.google.com/search?q=TOUR+NAME+CITY)
 8. CRITICAL: ALL flight routes MUST use ${departureAirport} as the departure and return airport - do NOT use any other airports
+9. CRITICAL: Output MUST be valid JSON with proper commas between all array elements and object properties
 
 Format:
 [
@@ -489,7 +515,12 @@ Format:
             systemPrompt: 'You are a travel planning assistant. Respond ONLY with valid JSON arrays. Create realistic trip packages with accurate pricing.',
             maxTokens: 2500,
             temperature: 0.7,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'trip_options_generation',
+            costTracker,
+        });
         await this.logger.logTelemetry(this.db, tripId, 'trip_options_generation', {
             provider: aiResponse.provider,
             model: aiResponse.model,
@@ -507,7 +538,18 @@ Format:
             const jsonMatch = aiResponse.text.match(/\[[\s\S]*\]/);
             if (!jsonMatch)
                 throw new Error('No JSON array found in response');
-            const options = JSON.parse(jsonMatch[0]);
+            // Use jsonrepair library to fix AI JSON errors
+            const repairedJSON = extractAndRepairJSON(jsonMatch[0]);
+            let options;
+            try {
+                options = JSON.parse(repairedJSON);
+            }
+            catch (parseError) {
+                // Log both original and repaired for debugging
+                this.logger.warn(`JSON repair failed, original: ${jsonMatch[0].slice(0, 500)}...`);
+                this.logger.warn(`Repaired attempt: ${repairedJSON.slice(0, 500)}...`);
+                throw parseError;
+            }
             if (!Array.isArray(options) || options.length === 0) {
                 throw new Error('AI returned invalid trip options');
             }
@@ -515,7 +557,7 @@ Format:
             return options;
         }
         catch (error) {
-            this.logger.error(`Failed to parse AI trip options: ${error}\nResponse: ${aiResponse.text}`);
+            this.logger.error(`Failed to parse AI trip options: ${error}`);
             throw new Error('Failed to generate trip options');
         }
     }
@@ -569,7 +611,12 @@ Format as JSON array:
             systemPrompt: 'You are a travel planning assistant. Respond ONLY with a valid JSON array of daily itinerary objects.',
             maxTokens: 3000,
             temperature: 0.7,
-        }, costTracker);
+        }, {
+            modelId: this.currentModelId,
+            tripId,
+            taskType: 'daily_itinerary_generation',
+            costTracker,
+        });
         const elapsed = Date.now() - startTime;
         try {
             const jsonMatch = aiResponse.text.match(/\[[\s\S]*\]/);
